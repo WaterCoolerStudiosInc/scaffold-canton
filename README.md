@@ -87,6 +87,44 @@ Create a service account in Keycloak for the backend's registration flow:
 4. **Service Account Roles** tab → assign `realm-management → manage-users`
 5. Copy the secret from **Credentials** into `KEYCLOAK_ADMIN_CLIENT_SECRET`
 
+> **Note:** The `backend-admin` client lives in the `canton` realm and authenticates against it (`/realms/canton/...`). Do not use the `master` realm token endpoint.
+
+## Test dashboard
+
+A browser-based test dashboard is included in `frontend/` for exercising every tRPC procedure without writing curl commands.
+
+```bash
+cd frontend
+npm install
+npm run dev
+# Open http://localhost:5173
+```
+
+### Keycloak setup (one-time)
+
+#### Create the `canton-test-dashboard` OIDC client
+
+Admin UI: **Clients** → **Create client**:
+1. **Client ID**: `canton-test-dashboard`
+2. **Client authentication**: OFF (public client — no secret)
+3. **Authentication flow**: Standard flow ON, Direct access grants OFF
+4. **Valid redirect URIs**: `http://localhost:5173/*`
+5. **Valid post logout redirect URIs**: `http://localhost:5173`
+6. **Web origins**: `http://localhost:5173`
+7. **Client scopes** → assign `daml_ledger_api` as a default scope
+
+Then copy `frontend/.env.local.example` to `frontend/.env.local`:
+
+```bash
+VITE_OIDC_AUTHORITY=https://auth.yourdomain.com/realms/canton
+VITE_OIDC_CLIENT_ID=canton-test-dashboard
+VITE_OIDC_REDIRECT_URI=http://localhost:5173
+```
+
+The login button redirects to the Keycloak login page. After authenticating, you are returned to the dashboard with a JWT attached to all tRPC calls.
+
+---
+
 ## Bootstrap
 
 After starting the server, create the `SimpleTokenRules` factory contract once:

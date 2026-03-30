@@ -1,0 +1,35 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=.env.local --import tsx --watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "1.19.11",
+    "@hono/trpc-server": "0.4.2",
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "0.71.0",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "0.213.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "0.213.0",
+    "@opentelemetry/resources": "2.6.0",
+    "@opentelemetry/sdk-metrics": "2.6.0",
+    "@opentelemetry/sdk-node": "0.213.0",
+    "@opentelemetry/semantic-conventions": "1.40.0",
+    "@trpc/server": "11.13.4",
+    "hono": "4.12.8",
+    "jose": "6.2.1",
+    "postgres": "3.4.8",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "25.5.0",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  }
+}
