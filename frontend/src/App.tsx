@@ -18,9 +18,9 @@ export default function App() {
   useEffect(() => {
     if (auth.user?.access_token) {
       setToken(auth.user.access_token)
-      trpc.whoami.query()
+      trpc.user.getPartyForUser.query()
         .then(({ partyId: p }) => setPartyId(p))
-        .catch(() => setPartyId(auth.user?.profile.preferred_username ?? auth.user?.profile.sub ?? null))
+        .catch(() => setPartyId(auth.user?.profile.sub ?? null))
       const validatorUrl = import.meta.env.VITE_VALIDATOR_URL
       if (validatorUrl) {
         fetch(`${validatorUrl}/api/validator/v0/register`, {

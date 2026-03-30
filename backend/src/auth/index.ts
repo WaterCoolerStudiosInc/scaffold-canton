@@ -42,8 +42,7 @@ export async function resolveContext(
       const { payload } = await jose.jwtVerify(token, jwks, {
         audience: config.audience,
       });
-      const partyId =
-        (payload['party_id'] as string | undefined) ?? config.adminParty;
+      const partyId = (payload['party_id'] as string | undefined) ?? '';
       const sub = payload.sub;
       return { partyId, isAdmin: partyId === config.adminParty, token, sub };
     } catch {

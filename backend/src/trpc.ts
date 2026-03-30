@@ -15,6 +15,8 @@ export type Context = {
   ledger: LedgerClient;
   participant: ParticipantClient;
   keycloak: KeycloakClient;
+  validatorUrl: string;
+  getLedgerToken: () => Promise<string>;
 };
 
 const t = initTRPC.context<Context>().create();

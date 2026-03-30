@@ -6,11 +6,8 @@ import { registrationRouter } from './registration.js';
 
 export const appRouter = router({
   health: publicProcedure.query(() => ({ status: 'ok' as const })),
-  whoami: partyProcedure.query(async ({ ctx }) => {
-    const partyId = ctx.sub
-      ? await ctx.participant.getPartyForUser(ctx.sub, ctx.token).catch(() => null) ?? ctx.partyId
-      : ctx.partyId;
-    return { partyId, isAdmin: ctx.isAdmin };
+  whoami: partyProcedure.query(({ ctx }) => {
+    return { partyId: ctx.partyId, isAdmin: ctx.isAdmin };
   }),
   admin: adminRouter,
   user: userRouter,

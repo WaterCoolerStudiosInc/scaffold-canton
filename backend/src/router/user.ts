@@ -14,7 +14,33 @@ import { randomUUID } from 'crypto';
 
 const instrumentIdSchema = z.object({ admin: z.string(), id: z.string() });
 
+async function callValidatorOnboard(validatorUrl: string, getToken: () => Promise<string>, userId: string, partyId: string): Promise<{ status: number; body: string }> {
+  const token = await getToken();
+  const res = await fetch(`${validatorUrl}/api/validator/v0/admin/users`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: userId, party_id: partyId }),
+  });
+  return { status: res.status, body: await res.text() };
+}
+
 export const userRouter = router({
+  getPartyForUser: partyProcedure.query(async ({ ctx }) => {
+    if (!ctx.sub) return { partyId: ctx.partyId };
+    const partyId = await ctx.participant.getPartyForUser(ctx.sub, ctx.token).catch(() => null);
+    return { partyId: partyId ?? ctx.partyId };
+  }),
+
+  onboardWallet: partyProcedure.mutation(async ({ ctx }) => {
+    if (!ctx.validatorUrl) throw new Error('VALIDATOR_URL not configured');
+    if (!ctx.sub) throw new Error('No user ID in token');
+    const { status, body } = await callValidatorOnboard(ctx.validatorUrl, ctx.getLedgerToken, ctx.sub, ctx.partyId);
+    if (status >= 400 && status !== 409) {
+      throw new Error(`Validator onboard failed ${status}: ${body}`);
+    }
+    return { ok: true };
+  }),
+
   getHoldings: partyProcedure.query(async ({ ctx }) => {
     return getHoldings(ctx.pqs, ctx.partyId);
   }),

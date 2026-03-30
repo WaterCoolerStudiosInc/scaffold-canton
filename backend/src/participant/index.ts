@@ -14,6 +14,16 @@ export function createParticipantClient(
     });
     if (!res.ok) {
       const body = await res.text();
+      // In-flight: wait for the existing allocation to complete then retry
+      if (res.status === 409) {
+        await new Promise((r) => setTimeout(r, 1500));
+        return allocateParty(hint);
+      }
+      // Already exists: parse the party ID out of the error and return it
+      if (res.status === 400) {
+        const match = body.match(/party ([\w-]+::[0-9a-f]+)/);
+        if (match) return match[1];
+      }
       throw new Error(`allocateParty failed ${res.status}: ${body}`);
     }
     const data = (await res.json()) as { partyDetails: { party: string } };

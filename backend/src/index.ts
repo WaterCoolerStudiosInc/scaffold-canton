@@ -71,6 +71,9 @@ const keycloak = createKeycloakClient(
   process.env.KEYCLOAK_ADMIN_CLIENT_SECRET ?? ''
 );
 
+// Cache sub → partyId so we only hit the ledger once per user per server lifetime
+const partyCache = new Map<string, string>();
+
 const app = new Hono();
 
 app.use('*', cors({
@@ -89,7 +92,21 @@ app.use(
       const auth = authHeader
         ? await resolveContext(authHeader, authConfig).catch(() => ({ partyId: '', isAdmin: false, token: authHeader.slice(7) }))
         : { partyId: '', isAdmin: false, token: '' };
-      return { ...auth, adminParty: authConfig.adminParty, pqs, ledger, participant, keycloak };
+
+      let partyId = auth.partyId;
+      if (!partyId && auth.sub) {
+        if (partyCache.has(auth.sub)) {
+          partyId = partyCache.get(auth.sub)!;
+        } else {
+          const found = await participant.getPartyForUser(auth.sub).catch(() => null);
+          if (found) {
+            partyCache.set(auth.sub, found);
+            partyId = found;
+          }
+        }
+      }
+      const isAdmin = partyId === authConfig.adminParty;
+      return { ...auth, partyId, isAdmin, adminParty: authConfig.adminParty, pqs, ledger, participant, keycloak, validatorUrl: process.env.VALIDATOR_URL ?? '', getLedgerToken };
     },
   })
 );

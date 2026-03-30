@@ -102,7 +102,35 @@ npm run dev
 
 ### Keycloak setup (one-time)
 
-#### Create the `canton-test-dashboard` OIDC client
+#### 1. Add `sub` mapper to the `daml_ledger_api` scope
+
+The `daml_ledger_api` scope must include the user's Keycloak UUID as `sub` in the access token. This is how the backend and ledger identify which Canton user is making a request.
+
+Admin UI: **Client scopes** → `daml_ledger_api` → **Mappers** → **Add mapper** → **By configuration** → **User ID**:
+- Name: `sub`
+- Mapper type: `User ID` (oidc-sub-mapper)
+- Add to access token: **ON**
+
+Or via API:
+```bash
+SCOPE_ID=<daml_ledger_api scope UUID>
+curl -X POST "$KEYCLOAK_BASE_URL/admin/realms/canton/client-scopes/$SCOPE_ID/protocol-mappers/models" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "sub",
+    "protocol": "openid-connect",
+    "protocolMapper": "oidc-sub-mapper",
+    "config": {
+      "access.token.claim": "true",
+      "introspection.token.claim": "true"
+    }
+  }'
+```
+
+Without this, access tokens have no `sub` claim and the backend cannot resolve which Canton party belongs to the logged-in user.
+
+#### 2. Create the `canton-test-dashboard` OIDC client
 
 Admin UI: **Clients** → **Create client**:
 1. **Client ID**: `canton-test-dashboard`

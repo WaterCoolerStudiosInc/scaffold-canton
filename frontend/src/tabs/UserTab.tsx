@@ -93,6 +93,19 @@ function InitiateTransferPanel() {
   )
 }
 
+function OnboardWalletPanel() {
+  const { loading, result, error, run } = useCall()
+  return (
+    <Panel title="onboardWallet">
+      <p className="text-xs text-gray-500 mb-1">
+        Creates the WalletAppInstall and MergeDelegation contracts on the Splice validator so this party can hold tokens and pay fees.
+      </p>
+      <Btn onClick={() => run(() => trpc.user.onboardWallet.mutate())} loading={loading} label="Onboard Wallet" />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
 export function UserTab({ isAuthenticated }: { isAuthenticated: boolean }) {
   if (!isAuthenticated) {
     return <p className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-3">Login in the Auth tab first.</p>
@@ -100,6 +113,7 @@ export function UserTab({ isAuthenticated }: { isAuthenticated: boolean }) {
 
   return (
     <div>
+      <OnboardWalletPanel />
       <QueryPanel title="getHoldings" fn={() => trpc.user.getHoldings.query()} />
       <QueryPanel title="getLockedHoldings" fn={() => trpc.user.getLockedHoldings.query()} />
       <QueryPanel title="getPendingTransfers" fn={() => trpc.user.getPendingTransfers.query()} />
