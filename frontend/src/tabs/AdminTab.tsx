@@ -37,16 +37,6 @@ function Btn({ onClick, loading, label }: { onClick: () => void; loading: boolea
   )
 }
 
-function GetRulesPanel() {
-  const { loading, result, error, run } = useCall()
-  return (
-    <Panel title="getRules">
-      <Btn onClick={() => run(() => trpc.admin.getRules.query())} loading={loading} label="Get Rules" />
-      <ResultBox result={result} error={error} />
-    </Panel>
-  )
-}
-
 function CreateRulesPanel() {
   const [instruments, setInstruments] = useState('')
   const { loading, result, error, run } = useCall()
@@ -177,17 +167,160 @@ function CreatePreapprovalPanel() {
   )
 }
 
+function ListPartiesPanel() {
+  const [pageToken, setPageToken] = useState('')
+  const { loading, result, error, run } = useCall()
+  return (
+    <Panel title="listParties">
+      <div className="max-w-lg">
+        <Field label="Page Token (optional)" value={pageToken} onChange={setPageToken} placeholder="leave empty for first page" />
+      </div>
+      <Btn onClick={() => run(() => trpc.admin.listParties.query({ pageToken: pageToken || undefined }))} loading={loading} label="List Parties" />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
+function ListUsersPanel() {
+  const [pageToken, setPageToken] = useState('')
+  const { loading, result, error, run } = useCall()
+  return (
+    <Panel title="listUsers">
+      <div className="max-w-lg">
+        <Field label="Page Token (optional)" value={pageToken} onChange={setPageToken} placeholder="leave empty for first page" />
+      </div>
+      <Btn onClick={() => run(() => trpc.admin.listUsers.query({ pageToken: pageToken || undefined }))} loading={loading} label="List Users" />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
+function GetUserPanel() {
+  const [userId, setUserId] = useState('')
+  const { loading, result, error, run } = useCall()
+  return (
+    <Panel title="getUser">
+      <div className="max-w-lg">
+        <Field label="User ID" value={userId} onChange={setUserId} placeholder="keycloak-uuid" />
+      </div>
+      <Btn onClick={() => run(() => trpc.admin.getUser.query({ userId }))} loading={loading} label="Get User" />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
+function GrantRightsPanel() {
+  const [userId, setUserId] = useState('')
+  const [partyId, setPartyId] = useState('')
+  const { loading, result, error, run } = useCall()
+  return (
+    <Panel title="grantRights">
+      <div className="flex flex-col gap-2 max-w-lg">
+        <Field label="User ID" value={userId} onChange={setUserId} placeholder="keycloak-uuid" />
+        <Field label="Party ID" value={partyId} onChange={setPartyId} placeholder="party::namespace" />
+      </div>
+      <Btn onClick={() => run(() => trpc.admin.grantRights.mutate({ userId, partyId }))} loading={loading} label="Grant" />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
+function RevokeRightsPanel() {
+  const [userId, setUserId] = useState('')
+  const [partyId, setPartyId] = useState('')
+  const { loading, result, error, run } = useCall()
+  return (
+    <Panel title="revokeRights">
+      <div className="flex flex-col gap-2 max-w-lg">
+        <Field label="User ID" value={userId} onChange={setUserId} placeholder="keycloak-uuid" />
+        <Field label="Party ID" value={partyId} onChange={setPartyId} placeholder="party::namespace" />
+      </div>
+      <Btn onClick={() => run(() => trpc.admin.revokeRights.mutate({ userId, partyId }))} loading={loading} label="Revoke" />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
+function ListPackagesPanel() {
+  const { loading, result, error, run } = useCall()
+  return (
+    <Panel title="listPackages">
+      <p className="text-xs text-gray-500 mb-2">Lists all DAR packages uploaded to this participant node.</p>
+      <Btn onClick={() => run(() => trpc.admin.listPackages.query())} loading={loading} label="List Packages" />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
+function ListKnownTemplatesPanel() {
+  const { loading, result, error, run } = useCall()
+  return (
+    <Panel title="listKnownTemplates">
+      <p className="text-xs text-gray-500 mb-2">
+        Lists all distinct template IDs indexed by PQS. Use this to find the correct template ID format for your deployed DARs.
+      </p>
+      <Btn onClick={() => run(() => trpc.admin.listKnownTemplates.query())} loading={loading} label="List Templates" />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
+function GetActiveContractsPanel() {
+  const [parties, setParties] = useState('')
+  const [templateIds, setTemplateIds] = useState('')
+  const [limit, setLimit] = useState('')
+  const { loading, result, error, run } = useCall()
+  return (
+    <Panel title="getActiveContracts">
+      <p className="text-xs text-gray-500 mb-2">
+        Queries active contracts directly from the ledger API. For large result sets use PQS instead.
+      </p>
+      <div className="flex flex-col gap-2 max-w-lg">
+        <label className="flex flex-col gap-1 text-xs text-gray-600">
+          Parties (one per line, required)
+          <textarea value={parties} onChange={(e) => setParties(e.target.value)}
+            rows={2} className="border rounded px-2 py-1.5 text-sm text-gray-900 font-mono" />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-gray-600">
+          Template IDs (one per line, optional — leave empty for all)
+          <textarea value={templateIds} onChange={(e) => setTemplateIds(e.target.value)}
+            rows={2} className="border rounded px-2 py-1.5 text-sm text-gray-900 font-mono"
+            placeholder="simple-token-0.1.0:SimpleToken.Holding:SimpleHolding" />
+        </label>
+        <Field label="Limit (optional)" value={limit} onChange={setLimit} placeholder="100" />
+      </div>
+      <Btn
+        onClick={() => run(() => trpc.admin.getActiveContracts.query({
+          parties: parties.split('\n').map((s) => s.trim()).filter(Boolean),
+          templateIds: templateIds.split('\n').map((s) => s.trim()).filter(Boolean) || undefined,
+          limit: limit ? Number(limit) : undefined,
+        }))}
+        loading={loading}
+        label="Fetch"
+      />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
 export function AdminTab() {
   return (
     <div>
       <p className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2 mb-4">
         Admin procedures require you to be logged in as the admin party (APP_PROVIDER_PARTY).
       </p>
-      <GetRulesPanel />
       <CreateRulesPanel />
       <UpdateInstrumentsPanel />
       <MintHoldingPanel />
       <CreatePreapprovalPanel />
+      <ListPartiesPanel />
+      <ListUsersPanel />
+      <GetUserPanel />
+      <GrantRightsPanel />
+      <RevokeRightsPanel />
+      <GetActiveContractsPanel />
+      <ListPackagesPanel />
+      <ListKnownTemplatesPanel />
     </div>
   )
 }

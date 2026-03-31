@@ -1,4 +1,15 @@
-// src/domain/types.ts
+import { z } from 'zod';
+
+export const TEMPLATE_IDS = {
+  SimpleHolding:                'SimpleToken.Holding:SimpleHolding',
+  LockedSimpleHolding:          'SimpleToken.Holding:LockedSimpleHolding',
+  SimpleTokenRules:             'SimpleToken.Rules:SimpleTokenRules',
+  SimpleTransferInstruction:    'SimpleToken.TransferInstruction:SimpleTransferInstruction',
+  SimpleAllocation:             'SimpleToken.Allocation:SimpleAllocation',
+  TransferPreapproval:          'SimpleToken.Preapproval:TransferPreapproval',
+  SimpleAllocationRequest:      'SimpleToken.AllocationRequest:SimpleAllocationRequest',
+} as const;
+export const instrumentIdSchema = z.object({ admin: z.string(), id: z.string() });
 
 export type AnyValue =
   | { tag: 'Text'; value: string }
@@ -14,6 +25,8 @@ export type AnyValue =
 export type Metadata = {
   values: Record<string, AnyValue>;
 };
+
+export const EMPTY_META: Metadata = { values: {} };
 
 export type InstrumentId = {
   admin: string;
@@ -52,22 +65,6 @@ export type AllocationSpecification = {
   settlement: SettlementInfo;
 };
 
-export const TEMPLATE_IDS = {
-  SimpleHolding:
-    'simple-token-0.1.0:SimpleToken.Holding:SimpleHolding',
-  LockedSimpleHolding:
-    'simple-token-0.1.0:SimpleToken.Holding:LockedSimpleHolding',
-  SimpleTokenRules:
-    'simple-token-0.1.0:SimpleToken.Rules:SimpleTokenRules',
-  SimpleTransferInstruction:
-    'simple-token-0.1.0:SimpleToken.TransferInstruction:SimpleTransferInstruction',
-  SimpleAllocation:
-    'simple-token-0.1.0:SimpleToken.Allocation:SimpleAllocation',
-  TransferPreapproval:
-    'simple-token-0.1.0:SimpleToken.Preapproval:TransferPreapproval',
-  SimpleAllocationRequest:
-    'simple-token-0.1.0:SimpleToken.AllocationRequest:SimpleAllocationRequest',
-} as const;
 
 export type SimpleHolding = {
   admin: string;

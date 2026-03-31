@@ -6,15 +6,17 @@ import { AuthTab } from './tabs/AuthTab'
 import { RegistrationTab } from './tabs/RegistrationTab'
 import { AdminTab } from './tabs/AdminTab'
 import { UserTab } from './tabs/UserTab'
+import { PqsTab } from './tabs/PqsTab'
 import { setToken, trpc } from './trpc'
 
-type Tab = 'health' | 'auth' | 'registration' | 'admin' | 'user'
+type Tab = 'health' | 'auth' | 'registration' | 'admin' | 'user' | 'pqs'
 
 export default function App() {
   const auth = useAuth()
   const [tab, setTab] = useState<Tab>('health')
   const [partyId, setPartyId] = useState<string | null>(null)
 
+  // example for auto-onboarding to validator wallet
   useEffect(() => {
     if (auth.user?.access_token) {
       setToken(auth.user.access_token)
@@ -27,7 +29,7 @@ export default function App() {
           method: 'POST',
           headers: { Authorization: `Bearer ${auth.user.access_token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
-        }).catch(() => {/* ignore — already onboarded or validator unreachable */})
+        }).catch(() => {/* ignore — already onboarded or validator unreachable */ })
       }
     } else {
       setToken(null)
@@ -49,6 +51,7 @@ export default function App() {
       {tab === 'registration' && <RegistrationTab />}
       {tab === 'admin' && <AdminTab />}
       {tab === 'user' && <UserTab isAuthenticated={auth.isAuthenticated} />}
+      {tab === 'pqs' && <PqsTab isAuthenticated={auth.isAuthenticated} />}
     </div>
   )
 }

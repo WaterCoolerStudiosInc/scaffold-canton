@@ -4,11 +4,11 @@ export function createKeycloakClient(
   adminClientId: string,
   adminClientSecret: string
 ) {
-  let cachedToken = '';
-  let expiresAt = 0;
+  let cachedToken = ''
+  let expiresAt = 0
 
   async function getAdminToken(): Promise<string> {
-    if (cachedToken && Date.now() / 1000 < expiresAt - 60) return cachedToken;
+    if (cachedToken && Date.now() / 1000 < expiresAt - 60) return cachedToken
     const res = await fetch(
       `${baseUrl}/realms/${realm}/protocol/openid-connect/token`,
       {
@@ -20,19 +20,19 @@ export function createKeycloakClient(
           client_secret: adminClientSecret,
         }),
       }
-    );
-    if (!res.ok) throw new Error(`Keycloak admin token failed: ${res.status}`);
-    const data = (await res.json()) as { access_token: string; expires_in: number };
-    cachedToken = data.access_token;
-    expiresAt = Date.now() / 1000 + (data.expires_in ?? 300);
-    return cachedToken;
+    )
+    if (!res.ok) throw new Error(`Keycloak admin token failed: ${res.status}`)
+    const data = (await res.json()) as { access_token: string; expires_in: number }
+    cachedToken = data.access_token
+    expiresAt = Date.now() / 1000 + (data.expires_in ?? 300)
+    return cachedToken
   }
 
   async function createUser(
     username: string,
     password: string
   ): Promise<string> {
-    const token = await getAdminToken();
+    const token = await getAdminToken()
     const res = await fetch(`${baseUrl}/admin/realms/${realm}/users`, {
       method: 'POST',
       headers: {
@@ -44,31 +44,31 @@ export function createKeycloakClient(
         enabled: true,
         credentials: [{ type: 'password', value: password, temporary: false }],
       }),
-    });
+    })
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Keycloak createUser failed ${res.status}: ${body}`);
+      const body = await res.text()
+      throw new Error(`Keycloak createUser failed ${res.status}: ${body}`)
     }
-    const location = res.headers.get('location') ?? '';
-    return location.split('/').pop() ?? '';
+    const location = res.headers.get('location') ?? ''
+    return location.split('/').pop() ?? ''
   }
 
   async function deleteUser(keycloakUserId: string): Promise<void> {
-    const token = await getAdminToken();
+    const token = await getAdminToken()
     const res = await fetch(
       `${baseUrl}/admin/realms/${realm}/users/${encodeURIComponent(keycloakUserId)}`,
       {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       }
-    );
+    )
     if (!res.ok && res.status !== 404) {
-      const body = await res.text();
-      throw new Error(`Keycloak deleteUser failed ${res.status}: ${body}`);
+      const body = await res.text()
+      throw new Error(`Keycloak deleteUser failed ${res.status}: ${body}`)
     }
   }
 
-  return { createUser, deleteUser };
+  return { createUser, deleteUser }
 }
 
-export type KeycloakClient = ReturnType<typeof createKeycloakClient>;
+export type KeycloakClient = ReturnType<typeof createKeycloakClient>

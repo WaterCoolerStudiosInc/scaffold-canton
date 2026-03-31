@@ -1,4 +1,3 @@
-// src/router/registration.ts
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure } from '../trpc.js';

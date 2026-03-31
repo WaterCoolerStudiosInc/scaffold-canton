@@ -1,4 +1,3 @@
-// src/domain/rules.ts
 import { buildCreate, buildExercise, type LedgerCommand } from '../ledger/index.js';
 import type { PqsClient, PqsContract } from '../pqs/index.js';
 import { TEMPLATE_IDS, type SimpleTokenRules } from './types.js';

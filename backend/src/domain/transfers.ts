@@ -1,8 +1,8 @@
-// src/domain/transfers.ts
 import { buildExercise, buildCreate, type LedgerCommand } from '../ledger/index.js';
 import type { PqsClient, PqsContract } from '../pqs/index.js';
 import {
   TEMPLATE_IDS,
+  EMPTY_META,
   type Transfer,
   type InstrumentId,
   type Metadata,
@@ -14,8 +14,6 @@ import {
 const RULES = TEMPLATE_IDS.SimpleTokenRules;
 const INSTRUCTION = TEMPLATE_IDS.SimpleTransferInstruction;
 const PREAPPROVAL = TEMPLATE_IDS.TransferPreapproval;
-
-const EMPTY_META: Metadata = { values: {} };
 
 export function buildInitiateTransfer(
   rulesContractId: string,

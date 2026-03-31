@@ -1,4 +1,3 @@
-// src/trpc.ts
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { PqsClient } from './pqs/index.js';
 import type { LedgerClient } from './ledger/index.js';

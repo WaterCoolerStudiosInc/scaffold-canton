@@ -1,4 +1,4 @@
-type Tab = 'health' | 'auth' | 'registration' | 'admin' | 'user'
+type Tab = 'health' | 'auth' | 'registration' | 'admin' | 'user' | 'pqs'
 
 interface Props {
   active: Tab
@@ -11,6 +11,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'registration', label: 'Registration' },
   { id: 'admin', label: 'Admin' },
   { id: 'user', label: 'User' },
+  { id: 'pqs', label: 'PQS' },
 ]
 
 export function TabBar({ active, onChange }: Props) {

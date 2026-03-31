@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { retryWithBackoff, registerUser } from './index.js';
+import { retryWithBackoff, registerUser } from '../registration/index.js';
 import type { ParticipantClient } from '../participant/index.js';
 import type { KeycloakClient } from '../keycloak/index.js';
 
@@ -36,6 +36,13 @@ function makeParticipant(overrides: Partial<ParticipantClient> = {}): Participan
     allocateParty: vi.fn().mockResolvedValue('alice::abc123'),
     createUser: vi.fn().mockResolvedValue(undefined),
     deleteUser: vi.fn().mockResolvedValue(undefined),
+    getPartyForUser: vi.fn().mockResolvedValue(null),
+    listParties: vi.fn().mockResolvedValue({ parties: [] }),
+    getParticipantId: vi.fn().mockResolvedValue('participant-id'),
+    listUsers: vi.fn().mockResolvedValue({ users: [] }),
+    getUser: vi.fn().mockResolvedValue({ userId: 'user-id' }),
+    grantRights: vi.fn().mockResolvedValue(undefined),
+    revokeRights: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -57,7 +64,7 @@ describe('registerUser', () => {
     const result = await registerUser('alice', 'password', participant, keycloak, OPTS);
     expect(result).toEqual({ partyId: 'alice::abc123' });
     expect(participant.allocateParty).toHaveBeenCalledWith('alice');
-    expect(keycloak.createUser).toHaveBeenCalledWith('alice', 'password', 'alice::abc123');
+    expect(keycloak.createUser).toHaveBeenCalledWith('alice', 'password');
     expect(participant.createUser).toHaveBeenCalledWith('kc-uuid-123', 'alice::abc123');
   });
 

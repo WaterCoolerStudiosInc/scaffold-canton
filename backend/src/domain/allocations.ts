@@ -1,4 +1,3 @@
-// src/domain/allocations.ts
 import { buildExercise, type LedgerCommand } from '../ledger/index.js';
 import type { PqsClient, PqsContract } from '../pqs/index.js';
 import { TEMPLATE_IDS, type SimpleAllocation } from './types.js';

@@ -1,8 +1,8 @@
-// src/domain/holdings.ts
 import { buildCreate, type LedgerCommand } from '../ledger/index.js';
 import type { PqsClient, PqsContract } from '../pqs/index.js';
 import {
   TEMPLATE_IDS,
+  EMPTY_META,
   type InstrumentId,
   type Metadata,
   type SimpleHolding,
@@ -11,8 +11,6 @@ import {
 
 const HOLDING = TEMPLATE_IDS.SimpleHolding;
 const LOCKED = TEMPLATE_IDS.LockedSimpleHolding;
-
-const EMPTY_META: Metadata = { values: {} };
 
 export function buildMintHolding(
   admin: string,

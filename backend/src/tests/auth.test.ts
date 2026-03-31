@@ -1,4 +1,3 @@
-// src/auth/index.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('jose', () => ({
@@ -7,7 +6,7 @@ vi.mock('jose', () => ({
 }));
 
 import * as jose from 'jose';
-import { resolveContext, type AuthConfig } from './index.js';
+import { resolveContext, type AuthConfig } from '../auth/index.js';
 
 const config: AuthConfig = {
   adminParty: 'admin-party::abc123',
@@ -36,7 +35,7 @@ describe('resolveContext', () => {
     } as never);
 
     const ctx = await resolveContext('Bearer valid.jwt.token', config);
-    expect(ctx).toEqual({ partyId: 'admin-party::abc123', isAdmin: true, token: 'valid.jwt.token' });
+    expect(ctx).toEqual({ partyId: 'admin-party::abc123', isAdmin: true, token: 'valid.jwt.token', sub: undefined });
   });
 
   it('returns isAdmin false for non-admin party', async () => {
@@ -45,7 +44,7 @@ describe('resolveContext', () => {
     } as never);
 
     const ctx = await resolveContext('Bearer valid.jwt.token', config);
-    expect(ctx).toEqual({ partyId: 'user-party::xyz789', isAdmin: false, token: 'valid.jwt.token' });
+    expect(ctx).toEqual({ partyId: 'user-party::xyz789', isAdmin: false, token: 'valid.jwt.token', sub: undefined });
   });
 
   it('throws UNAUTHORIZED when JWT validation fails', async () => {

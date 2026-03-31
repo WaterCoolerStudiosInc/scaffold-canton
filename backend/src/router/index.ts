@@ -1,4 +1,3 @@
-// src/router/index.ts
 import { router, publicProcedure, partyProcedure } from '../trpc.js';
 import { adminRouter } from './admin.js';
 import { userRouter } from './user.js';

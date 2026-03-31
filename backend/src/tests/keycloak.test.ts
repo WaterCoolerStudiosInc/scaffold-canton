@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createKeycloakClient } from './index.js';
+import { createKeycloakClient } from '../keycloak/index.js';
 
 describe('createKeycloakClient', () => {
   beforeEach(() => vi.restoreAllMocks());
@@ -29,7 +29,7 @@ describe('createKeycloakClient', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = createKeycloakClient('https://auth.example.com', 'canton', 'admin-cli', 'secret');
-    const id = await client.createUser('alice', 'password123', 'alice::abc123');
+    const id = await client.createUser('alice', 'password123');
 
     expect(id).toBe('user-uuid-123');
     const [tokenUrl, tokenOpts] = fetchMock.mock.calls[0];
@@ -40,7 +40,6 @@ describe('createKeycloakClient', () => {
     expect(userOpts.method).toBe('POST');
     const body = JSON.parse(userOpts.body);
     expect(body.username).toBe('alice');
-    expect(body.attributes.party_id).toEqual(['alice::abc123']);
     expect(body.credentials[0].value).toBe('password123');
   });
 
@@ -64,7 +63,7 @@ describe('createKeycloakClient', () => {
         })
     );
     const client = createKeycloakClient('https://auth.example.com', 'canton', 'admin-cli', 'secret');
-    await expect(client.createUser('alice', 'pw', 'alice::abc')).rejects.toThrow('409');
+    await expect(client.createUser('alice', 'pw')).rejects.toThrow('409');
   });
 
   it('deleteUser calls DELETE on user endpoint', async () => {

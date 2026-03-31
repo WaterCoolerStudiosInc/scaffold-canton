@@ -1,18 +1,17 @@
-// src/router/user.ts
 import { z } from 'zod';
 import { router, partyProcedure } from '../trpc.js';
-import { getHoldings, getLockedHoldings } from '../domain/holdings.js';
+import { getHoldings, getLockedHoldings, getHoldingById } from '../domain/holdings.js';
 import {
   getPendingTransfers,
+  getPreapprovals,
   buildInitiateTransfer,
   buildAcceptTransfer,
   buildRejectTransfer,
   buildWithdrawTransfer,
 } from '../domain/transfers.js';
 import { getAllocations, buildCancelAllocation, buildWithdrawAllocation } from '../domain/allocations.js';
+import { instrumentIdSchema } from '../domain/types.js';
 import { randomUUID } from 'crypto';
-
-const instrumentIdSchema = z.object({ admin: z.string(), id: z.string() });
 
 async function callValidatorOnboard(validatorUrl: string, getToken: () => Promise<string>, userId: string, partyId: string): Promise<{ status: number; body: string }> {
   const token = await getToken();
@@ -45,12 +44,22 @@ export const userRouter = router({
     return getHoldings(ctx.pqs, ctx.partyId);
   }),
 
+  getHoldingById: partyProcedure
+    .input(z.object({ contractId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return getHoldingById(ctx.pqs, input.contractId);
+    }),
+
   getLockedHoldings: partyProcedure.query(async ({ ctx }) => {
     return getLockedHoldings(ctx.pqs, ctx.partyId);
   }),
 
   getPendingTransfers: partyProcedure.query(async ({ ctx }) => {
     return getPendingTransfers(ctx.pqs, ctx.partyId);
+  }),
+
+  getPreapprovals: partyProcedure.query(async ({ ctx }) => {
+    return getPreapprovals(ctx.pqs, ctx.partyId);
   }),
 
   initiateTransfer: partyProcedure

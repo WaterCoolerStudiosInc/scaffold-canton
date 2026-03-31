@@ -24,16 +24,6 @@ function Btn({ onClick, loading, label }: { onClick: () => void; loading: boolea
   )
 }
 
-function QueryPanel({ title, fn }: { title: string; fn: () => Promise<unknown> }) {
-  const { loading, result, error, run } = useCall()
-  return (
-    <Panel title={title}>
-      <Btn onClick={() => run(fn)} loading={loading} label="Fetch" />
-      <ResultBox result={result} error={error} />
-    </Panel>
-  )
-}
-
 function ContractIdPanel({ title, label, fn }: { title: string; label: string; fn: (id: string) => Promise<unknown> }) {
   const [contractId, setContractId] = useState('')
   const { loading, result, error, run } = useCall()
@@ -114,10 +104,6 @@ export function UserTab({ isAuthenticated }: { isAuthenticated: boolean }) {
   return (
     <div>
       <OnboardWalletPanel />
-      <QueryPanel title="getHoldings" fn={() => trpc.user.getHoldings.query()} />
-      <QueryPanel title="getLockedHoldings" fn={() => trpc.user.getLockedHoldings.query()} />
-      <QueryPanel title="getPendingTransfers" fn={() => trpc.user.getPendingTransfers.query()} />
-      <QueryPanel title="getAllocations" fn={() => trpc.user.getAllocations.query()} />
       <InitiateTransferPanel />
       <ContractIdPanel title="acceptTransfer" label="Accept" fn={(id) => trpc.user.acceptTransfer.mutate({ contractId: id })} />
       <ContractIdPanel title="rejectTransfer" label="Reject" fn={(id) => trpc.user.rejectTransfer.mutate({ contractId: id })} />

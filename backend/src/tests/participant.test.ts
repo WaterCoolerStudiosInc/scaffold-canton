@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createParticipantClient } from './index.js';
+import { createParticipantClient } from '../participant/index.js';
 
 const getToken = vi.fn().mockResolvedValue('admin-token');
 
