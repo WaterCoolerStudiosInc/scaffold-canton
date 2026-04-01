@@ -166,7 +166,52 @@ npm run dev
 
 Log in with a Keycloak user. The JWT is automatically attached to all tRPC calls.
 
-### 7. Bootstrap the token factory (one-time)
+### 7. Upload the DARs to your validator (one-time)
+
+The token contracts must be uploaded to your Canton node before any contract operations will work.
+
+**Get an admin token** (`validator-app` has `participant_admin` rights):
+
+```bash
+CLIENT_SECRET=$(grep VALIDATOR_AUTH_CLIENT_SECRET \
+  splice-node/docker-compose/validator/.env | cut -d= -f2)
+
+TOKEN=$(curl -fsSL -X POST \
+  https://auth.yourdomain.com/realms/canton/protocol/openid-connect/token \
+  -d "client_id=validator-app" \
+  -d "client_secret=${CLIENT_SECRET}" \
+  -d "grant_type=client_credentials" \
+  | jq -r '.access_token')
+```
+
+**Upload each DAR** (repeat for every `.dar` file in `canton-token-template/dars/` and the compiled `simple-token-0.1.0.dar`):
+
+```bash
+# If ledger.yourdomain.com vhost is configured via proxy.sh:
+curl -fsS \
+  -X POST "https://ledger.yourdomain.com/v2/packages" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @simple-token-0.1.0.dar
+
+# Or via SSH tunnel (see Tunneling section below):
+curl -fsS \
+  -X POST "http://localhost:7575/v2/packages" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @simple-token-0.1.0.dar
+```
+
+See [canton-validator-setup/docs/DAR.md](../canton-validator-setup/docs/DAR.md) for the full upload guide including gRPC upload via `daml ledger upload-dar` and troubleshooting.
+
+Verify the upload using **Admin → listPackages** in the frontend, or via the backend:
+
+```bash
+curl http://localhost:8080/trpc/admin.listPackages \
+  -H "Authorization: Bearer <admin-jwt>"
+```
+
+### 8. Bootstrap the token factory (one-time)
 
 Before any token operations can be performed, the admin must create the `SimpleTokenRules` contract on the ledger. In the frontend, go to the **Admin** tab and use **createRules** with your supported instruments (e.g. `USD`).
 
@@ -178,6 +223,50 @@ curl -X POST http://localhost:8080/trpc/admin.createRules \
   -H "Content-Type: application/json" \
   -d '{"json": {"supportedInstruments": ["USD"]}}'
 ```
+
+---
+
+## Tunneling to the validator
+
+If you're running the backend locally against a remote validator node, you need to tunnel two ports: the **JSON Ledger API** (port `7575`) and **PQS** (PostgreSQL, port `5434`).
+
+### Open the tunnels
+
+Run each in a separate terminal (or use a single command with multiple `-L` flags):
+
+```bash
+# JSON Ledger API
+ssh -L 7575:127.0.0.1:7575 user@your-server-ip -N
+
+# PQS (PostgreSQL)
+ssh -L 5434:127.0.0.1:5434 user@your-server-ip -N
+```
+
+Or as a single connection:
+
+```bash
+ssh -L 7575:127.0.0.1:7575 \
+    -L 5434:127.0.0.1:5434 \
+    user@your-server-ip -N
+```
+
+> The `-N` flag keeps the connection open without running a remote command. Add `-f` to background the tunnel.
+
+### Backend `.env.local` when tunneling
+
+```bash
+# Point directly at the tunneled ports instead of the public vhost
+LEDGER_URL=http://localhost:7575
+PQS_URL=postgresql://pqs:<password>@localhost:5434/pqs
+```
+
+The PQS password is in `canton-validator-setup/pqs/.env` on the server (`PQS_DB_PASSWORD`).
+
+Keycloak and the validator wallet are accessed via their public HTTPS URLs — no tunnel needed for those.
+
+### DAR uploads via tunnel
+
+See step 7 above — use `http://localhost:7575/v2/packages` as the upload URL when the tunnel is open.
 
 ---
 

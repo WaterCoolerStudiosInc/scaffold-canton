@@ -4,6 +4,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { trpcServer } from '@hono/trpc-server'
 import { appRouter } from './router/index.js'
+import { createUploadRouter } from './router/upload.js'
 import { resolveContext, type AuthConfig } from './auth/index.js'
 import { createPqsClient } from './pqs/index.js'
 import { createLedgerClient } from './ledger/index.js'
@@ -110,6 +111,8 @@ app.use(
     },
   })
 )
+
+app.route('/', createUploadRouter(authConfig, ledger, participant, partyCache))
 
 serve({ fetch: app.fetch, port: 8080 }, () => {
   console.log('Backend listening on :8080')

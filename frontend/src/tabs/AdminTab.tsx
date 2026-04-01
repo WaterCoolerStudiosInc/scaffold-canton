@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { trpc } from '../trpc'
+import { trpc, getToken } from '../trpc'
 import { Panel } from '../components/Panel'
 import { Field } from '../components/Field'
 import { ResultBox } from '../components/ResultBox'
@@ -252,6 +252,77 @@ function ListPackagesPanel() {
   )
 }
 
+function UploadPackagePanel() {
+  const [loading, setLoading] = useState(false)
+  const [files, setFiles] = useState<File[]>([])
+  const [result, setResult] = useState<unknown>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function upload() {
+    if (!files.length) return
+    setLoading(true)
+    setError(null)
+    setResult(null)
+    try {
+      const before = new Set(await trpc.admin.listPackages.query())
+      const token = getToken()
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/octet-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      }
+      for (const file of files) {
+        const res = await fetch('http://localhost:8080/admin/upload-package', {
+          method: 'POST',
+          headers,
+          body: file,
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(`${file.name}: ${json.error ?? `HTTP ${res.status}`}`)
+      }
+      const after = await trpc.admin.listPackages.query()
+      const newPackages = after.filter((id) => !before.has(id))
+      setResult({
+        uploaded: files.map((f) => f.name),
+        newPackages: newPackages.length ? newPackages : '(already installed)',
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Panel title="uploadPackage">
+      <p className="text-xs text-gray-500 mb-2">Upload one or more .dar files to the participant node.</p>
+      <div className="flex items-center gap-3 max-w-lg">
+        <label className="cursor-pointer px-3 py-1.5 bg-gray-100 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-200">
+          Choose .dar files
+          <input
+            type="file"
+            accept=".dar"
+            multiple
+            className="hidden"
+            onChange={(e) => setFiles(e.target.files ? Array.from(e.target.files) : [])}
+          />
+        </label>
+        <span className="text-sm text-gray-500 truncate">
+          {files.length === 0 ? 'No files chosen' : files.length === 1 ? files[0].name : `${files.length} files selected`}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={upload}
+        disabled={loading || !files.length}
+        className="mt-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded disabled:opacity-50"
+      >
+        {loading ? 'Uploading…' : 'Upload'}
+      </button>
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
 function ListKnownTemplatesPanel() {
   const { loading, result, error, run } = useCall()
   return (
@@ -318,6 +389,7 @@ export function AdminTab() {
       <GetUserPanel />
       <GrantRightsPanel />
       <RevokeRightsPanel />
+      <UploadPackagePanel />
       <GetActiveContractsPanel />
       <ListPackagesPanel />
       <ListKnownTemplatesPanel />

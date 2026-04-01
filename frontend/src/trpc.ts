@@ -7,6 +7,10 @@ export function setToken(token: string | null) {
   _token = token
 }
 
+export function getToken(): string | null {
+  return _token
+}
+
 export const trpc = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({

@@ -129,7 +129,24 @@ export function createLedgerClient(
     return data.packageIds;
   }
 
-  return { submit, getActiveContracts, listPackages };
+  async function uploadPackage(dar: ArrayBuffer): Promise<unknown> {
+    const token = await getToken();
+    const res = await fetch(`${baseUrl}/v2/packages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: dar,
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`uploadPackage failed ${res.status}: ${body}`);
+    }
+    return res.json();
+  }
+
+  return { submit, getActiveContracts, listPackages, uploadPackage };
 }
 
 export type LedgerClient = ReturnType<typeof createLedgerClient>;
