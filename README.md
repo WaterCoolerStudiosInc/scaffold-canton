@@ -1,36 +1,32 @@
 # Scaffold Canton
 
-A full-stack scaffold for building applications on a Canton Network devnet validator. Connects to the [OpenZeppelin canton-token-template](https://github.com/OpenZeppelin/canton-token-template) DAR suite — a CIP-056 compliant token standard implementation.
+A full-stack scaffold for building applications on a Canton Network devnet validator. Includes a **Vault** Daml contract (deposit/withdraw) with two auth paths: Keycloak (hosted parties) and wallet gateway (external parties via dApp SDK).
 
 ## What this is
 
-- **Backend** — Hono + tRPC server that talks to a Canton validator node
-- **Frontend** — Browser dashboard for exercising every tRPC procedure without writing curl commands
-
-### Backend capabilities
-
-- **Admin procedures** — bootstrap the token factory, mint holdings, manage instruments, create transfer preapprovals, manage parties and users
-- **User procedures** — query balances, initiate transfers, accept/reject pending transfers, manage allocations
-- **User registration** — allocates a Canton party, creates a ledger user, and creates a Keycloak user in one flow with retry and compensation logic
+- **Daml contract** — `Vault.daml` with `DepositRequest` and `Deposit` templates
+- **Backend** — Hono + tRPC server for Ledger API writes, PQS reads, and user registration
+- **Frontend** — Dashboard with OIDC login (hosted parties) + wallet gateway (external parties)
+- **Wallet Gateway** — Splice Wallet Kernel for external party creation and signing
 
 ## Stack
 
 | Layer | Technology |
 |---|---|
+| Smart contracts | [Daml](https://docs.digitalasset.com) 3.4 on Canton 3.x |
 | HTTP server | [Hono](https://hono.dev) |
 | API | [tRPC](https://trpc.io) v11 |
-| Auth | Keycloak (OAuth2 JWT via JWKS) |
+| Auth | Keycloak (OAuth2 JWT) + Wallet Gateway ([dApp SDK](https://github.com/hyperledger-labs/splice-wallet-kernel)) |
 | Ledger writes | Canton Ledger API v2 (HTTP/JSON) |
 | Ledger reads | PQS (PostgreSQL via [postgres.js](https://github.com/porsager/postgres)) |
 | Observability | OpenTelemetry (OTLP gRPC) |
-| Runtime | Node.js 22, TypeScript 5 (NodeNext) |
+| Runtime | Node.js 22, TypeScript 5 |
 
 ## Prerequisites
 
 - Node.js 22+
-- A running Canton devnet validator (see [canton-validator-setup](../canton-validator-setup)) with Keycloak and PQS configured
-- The [canton-token-template](https://github.com/OpenZeppelin/canton-token-template) DARs uploaded to your validator
-- `dpm` CLI (optional — only needed if you want to regenerate JS/TS bindings from the DARs)
+- A running Canton devnet validator with Keycloak and PQS configured
+- `dpm` CLI (for Daml builds and codegen)
 
 ---
 
@@ -43,310 +39,225 @@ git clone <this-repo>
 cd scaffold-canton
 ```
 
-### 2. Configure the backend
+### 2. Build the Daml contract
+
+```bash
+cd daml
+daml build
+# → .daml/dist/scaffold-vault-0.1.0.dar
+```
+
+### 3. Generate TypeScript bindings
+
+```bash
+cd ..
+scripts/daml-codegen.sh \
+  -i daml/.daml/dist \
+  -o backend/src/generated
+```
+
+This generates `backend/src/generated/template-ids.ts` with the package hashes. The frontend imports these directly.
+
+### 4. Configure the backend
 
 ```bash
 cd backend
 cp .env.example .env.local
 ```
 
-Edit `.env.local`:
+Edit `.env.local` — see `.env.example` for all options. Key fields:
 
 ```bash
-# Your validator's operator party ID — found in your Canton node config
-APP_PROVIDER_PARTY=your-org-function-1::abc123...
-
-# Canton Ledger API — exposed via nginx (canton-validator-setup/scripts/proxy.sh)
+APP_PROVIDER_PARTY=cenote-validator-1::1220...  # your admin party
 LEDGER_URL=https://ledger.yourdomain.com
-
-# Splice validator URL — for wallet onboarding
 VALIDATOR_URL=https://wallet.yourdomain.com
-
-# Keycloak service account for the backend (validator-app client)
-# Found in Keycloak → canton realm → Clients → validator-app → Credentials
-LEDGER_TOKEN_URL=https://auth.yourdomain.com/realms/canton/protocol/openid-connect/token
-LEDGER_CLIENT_ID=validator-app
-LEDGER_CLIENT_SECRET=<from keycloak>
-
-# PQS PostgreSQL connection string (canton-validator-setup/scripts/pqs.sh)
-PQS_URL=postgresql://pqs:pqs@localhost:5432/pqs
-
-# Keycloak JWKS — for validating user JWTs
-JWKS_URI=https://auth.yourdomain.com/realms/canton/protocol/openid-connect/certs
-JWKS_AUDIENCE=https://canton.network.global
-
-# Keycloak Admin API — for user registration
-# Requires a backend-admin service account (see Keycloak setup below)
-KEYCLOAK_BASE_URL=https://auth.yourdomain.com
-KEYCLOAK_REALM=canton
-KEYCLOAK_ADMIN_CLIENT_ID=backend-admin
-KEYCLOAK_ADMIN_CLIENT_SECRET=<from keycloak>
+SYNCHRONIZER_ID=global-domain::1220...           # from GET /v2/state/connected-synchronizers
 ```
 
-### 3. Configure the frontend
+### 5. Configure the frontend
 
 ```bash
 cd frontend
 cp .env.example .env.local
 ```
 
-Edit `.env.local`:
-
 ```bash
-# Keycloak OIDC authority for the frontend login flow
 VITE_OIDC_AUTHORITY=https://auth.yourdomain.com/realms/canton
-
-# Keycloak client for the frontend (see Keycloak setup below)
 VITE_OIDC_CLIENT_ID=canton-test-dashboard
-
-# Must match your local dev URL
 VITE_OIDC_REDIRECT_URI=http://localhost:5173
-
-# Splice validator URL — for wallet onboarding
 VITE_VALIDATOR_URL=https://wallet.yourdomain.com
+VITE_LEDGER_URL=https://ledger.yourdomain.com
+VITE_WALLET_GATEWAY_URL=http://localhost:3030
 ```
 
-### 4. Keycloak one-time setup
+### 6. Keycloak one-time setup
 
 #### a. Add `sub` mapper to the `daml_ledger_api` scope
 
-The `daml_ledger_api` scope must include the user's Keycloak UUID as `sub`. Without this, the backend cannot map a logged-in user to their Canton party.
-
-Admin UI: **Client scopes** → `daml_ledger_api` → **Mappers** → **Add mapper** → **By configuration** → **User ID**:
-- Name: `sub`
-- Mapper type: `User ID` (oidc-sub-mapper)
+Admin UI: **Client scopes** → `daml_ledger_api` → **Mappers** → **Add mapper** → **User ID**:
 - Add to access token: **ON**
 
 #### b. Create the `canton-test-dashboard` OIDC client
 
-Admin UI: **Clients** → **Create client**:
-1. **Client ID**: `canton-test-dashboard`
-2. **Client authentication**: OFF (public client)
-3. **Authentication flow**: Standard flow ON, Direct access grants OFF
-4. **Valid redirect URIs**: `http://localhost:5173/*`
-5. **Valid post logout redirect URIs**: `http://localhost:5173`
-6. **Web origins**: `http://localhost:5173`
-7. **Client scopes** → assign `daml_ledger_api` as a default scope
+1. **Client authentication**: OFF (public client)
+2. **Valid redirect URIs**: `http://localhost:5173/*`, `http://localhost:3030/callback/`
+3. **Web origins**: `*`
+4. **Client scopes** → assign `daml_ledger_api` as default
+
+> The wallet gateway sends `redirect_uri` with a trailing slash. Add `http://localhost:3030/callback/` (with slash) to Valid Redirect URIs.
 
 #### c. Create the `backend-admin` service account
 
-This client is used by the backend to create Keycloak users during registration.
+1. **Client authentication**: ON, **Service Accounts Enabled**: ON
+2. **Service Account Roles** → assign `realm-management → manage-users`
 
-Admin UI: **Clients** → **Create client**:
-1. **Client ID**: `backend-admin`
-2. **Client authentication**: ON, **Service Accounts Enabled**: ON
-3. **Service Account Roles** tab → assign `realm-management → manage-users`
-4. Copy the secret from **Credentials** into `KEYCLOAK_ADMIN_CLIENT_SECRET`
-
-> The `backend-admin` client must authenticate against the `canton` realm, not `master`.
-
-### 5. Start the backend
+### 7. Upload the DAR
 
 ```bash
-cd backend
-npm install
-npm run dev
-```
-
-Verify:
-
-```bash
-curl http://localhost:8080/trpc/health
-# → {"result":{"data":{"status":"ok"}}}
-```
-
-### 6. Start the frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-# Open http://localhost:5173
-```
-
-Log in with a Keycloak user. The JWT is automatically attached to all tRPC calls.
-
-### 7. Upload the DARs to your validator (one-time)
-
-The token contracts must be uploaded to your Canton node before any contract operations will work.
-
-**Get an admin token** (`validator-app` has `participant_admin` rights):
-
-```bash
-CLIENT_SECRET=$(grep VALIDATOR_AUTH_CLIENT_SECRET \
-  splice-node/docker-compose/validator/.env | cut -d= -f2)
-
 TOKEN=$(curl -fsSL -X POST \
   https://auth.yourdomain.com/realms/canton/protocol/openid-connect/token \
   -d "client_id=validator-app" \
-  -d "client_secret=${CLIENT_SECRET}" \
+  -d "client_secret=${VALIDATOR_CLIENT_SECRET}" \
   -d "grant_type=client_credentials" \
   | jq -r '.access_token')
-```
 
-**Upload each DAR** (repeat for every `.dar` file in `canton-token-template/dars/` and the compiled `simple-token-0.1.0.dar`):
-
-```bash
-# If ledger.yourdomain.com vhost is configured via proxy.sh:
-curl -fsS \
-  -X POST "https://ledger.yourdomain.com/v2/packages" \
+curl -fsS -X POST "https://ledger.yourdomain.com/v2/packages" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/octet-stream" \
-  --data-binary @simple-token-0.1.0.dar
-
-# Or via SSH tunnel (see Tunneling section below):
-curl -fsS \
-  -X POST "http://localhost:7575/v2/packages" \
-  -H "Authorization: Bearer ${TOKEN}" \
-  -H "Content-Type: application/octet-stream" \
-  --data-binary @simple-token-0.1.0.dar
+  --data-binary @daml/.daml/dist/scaffold-vault-0.1.0.dar
 ```
 
-See [canton-validator-setup/docs/DAR.md](../canton-validator-setup/docs/DAR.md) for the full upload guide including gRPC upload via `daml ledger upload-dar` and troubleshooting.
-
-Verify the upload using **Admin → listPackages** in the frontend, or via the backend:
+### 8. Start everything
 
 ```bash
-curl http://localhost:8080/trpc/admin.listPackages \
-  -H "Authorization: Bearer <admin-jwt>"
-```
+# Terminal 1: backend
+cd backend && npm install && npm run dev
 
-### 8. Bootstrap the token factory (one-time)
+# Terminal 2: frontend
+cd frontend && npm install && npm run dev
 
-Before any token operations can be performed, the admin must create the `SimpleTokenRules` contract on the ledger. In the frontend, go to the **Admin** tab and use **createRules** with your supported instruments (e.g. `USD`).
-
-Or via curl:
-
-```bash
-curl -X POST http://localhost:8080/trpc/admin.createRules \
-  -H "Authorization: Bearer <admin-jwt>" \
-  -H "Content-Type: application/json" \
-  -d '{"json": {"supportedInstruments": ["USD"]}}'
+# Terminal 3: wallet gateway
+cd wallet-gateway && npm run start
 ```
 
 ---
 
-## Tunneling to the validator
+## End-to-end walkthrough: deposit and withdraw
 
-If you're running the backend locally against a remote validator node, you need to tunnel two ports: the **JSON Ledger API** (port `7575`) and **PQS** (PostgreSQL, port `5434`).
+This walks through the full Vault contract lifecycle with an external party (wallet gateway) and the admin (Keycloak).
 
-### Open the tunnels
+### Step 1: Connect wallet (external party)
 
-Run each in a separate terminal (or use a single command with multiple `-L` flags):
+1. Open `http://localhost:5173`
+2. Go to **Auth** tab → click **Connect gateway**
+3. The wallet gateway UI opens at `http://localhost:3030`
+4. Log in with Keycloak, create a wallet (choose **Participant** signing provider)
+5. Back in the scaffold, your party ID appears as connected
 
-```bash
-# JSON Ledger API
-ssh -L 7575:127.0.0.1:7575 user@your-server-ip -N
+### Step 2: Create a deposit request
 
-# PQS (PostgreSQL)
-ssh -L 5434:127.0.0.1:5434 user@your-server-ip -N
-```
+1. Go to **Wallet Tx** tab
+2. Enter an amount (e.g. `100`) and optional memo
+3. Click **Submit deposit request**
+4. The wallet gateway opens its approval page — approve the transaction
+5. The `DepositRequest` contract is created on the ledger
 
-Or as a single connection:
+> The admin must now accept this request.
 
-```bash
-ssh -L 7575:127.0.0.1:7575 \
-    -L 5434:127.0.0.1:5434 \
-    user@your-server-ip -N
-```
+### Step 3: Admin accepts the deposit
 
-> The `-N` flag keeps the connection open without running a remote command. Add `-f` to background the tunnel.
+1. Go to **Auth** tab → **Login with Keycloak** (as the admin/operator account)
+2. Go to **User** tab
+3. Click **Pending requests** to see the deposit request and its contract ID
+4. Copy the contract ID
+5. Paste into **Accept deposit request** → click **Accept**
+6. The `Deposit` contract is now active (both user and admin are signatories)
 
-### Backend `.env.local` when tunneling
+### Step 4: Verify the deposit
 
-```bash
-# Point directly at the tunneled ports instead of the public vhost
-LEDGER_URL=http://localhost:7575
-PQS_URL=postgresql://pqs:<password>@localhost:5434/pqs
-```
+- **Wallet Tx** tab → click **Confirmed deposits** to see the active `Deposit` contract
+- **User** tab → click **Confirmed deposits** to see it from the admin side
 
-The PQS password is in `canton-validator-setup/pqs/.env` on the server (`PQS_DB_PASSWORD`).
+### Step 5: User withdraws
 
-Keycloak and the validator wallet are accessed via their public HTTPS URLs — no tunnel needed for those.
-
-### DAR uploads via tunnel
-
-See step 7 above — use `http://localhost:7575/v2/packages` as the upload URL when the tunnel is open.
+1. Go to **Wallet Tx** tab
+2. Copy the `Deposit` contract ID from the confirmed deposits list
+3. Paste into **Withdraw deposit** → click **Withdraw**
+4. Approve in the wallet gateway UI
+5. The `Deposit` contract is archived
 
 ---
 
-## Generating Daml types (optional)
+## Vault contract
 
-The generated JS/TS bindings for the token contracts are gitignored. You only need to regenerate them if you're extending the backend to use the typed Daml client APIs.
+| Template | Signatories | Observers | Purpose |
+|---|---|---|---|
+| `DepositRequest` | user | admin | User proposes a deposit; admin must accept |
+| `Deposit` | user, admin | — | Confirmed deposit; user can withdraw, admin can release |
 
-```bash
-# 1. Build the DAR from source (requires Daml SDK)
-cd /path/to/canton-token-template/simple-token
-daml build
-# → .daml/dist/simple-token-0.1.0.dar
+**Choices:**
 
-# 2. Run codegen
-cd /path/to/scaffold-canton
-scripts/daml-codegen.sh \
-  -i /path/to/canton-token-template/simple-token/.daml/dist \
-  -o backend/src/generated
-```
+| Template | Choice | Controller | Effect |
+|---|---|---|---|
+| `DepositRequest` | `DepositRequest_Accept` | admin | Creates a `Deposit` |
+| `DepositRequest` | `DepositRequest_Cancel` | user | Archives the request |
+| `Deposit` | `Deposit_Withdraw` | user | Archives (user reclaims) |
+| `Deposit` | `Deposit_Release` | admin | Archives (admin returns) |
+
+---
+
+## Two auth paths
+
+| Path | Who | Writes | Reads |
+|---|---|---|---|
+| **Keycloak (OIDC)** | Hosted parties (admin, operators) | tRPC → backend → Ledger API | tRPC → backend → PQS |
+| **Wallet Gateway (dApp SDK)** | External parties (users) | dApp SDK `prepareExecute` → gateway signs | tRPC → backend → PQS (public, no JWT) |
+
+The wallet gateway creates external parties on **your participant** where your DARs are vetted. This is required for custom contracts — third-party wallet extensions (e.g. Console Wallet) create parties on their own infrastructure where your DARs aren't available.
 
 ---
 
 ## API overview
 
-### Public
+### Public (no JWT)
 
 | Procedure | Description |
 |---|---|
 | `health` | Health check |
-| `registration.register` | Create a new user (Canton party + ledger user + Keycloak user) |
-
-### Admin (requires admin JWT)
-
-| Procedure | Description |
-|---|---|
-| `admin.createRules` | Bootstrap the `SimpleTokenRules` factory (one-time) |
-| `admin.getRules` | Get the active rules contract |
-| `admin.updateInstruments` | Update the supported instruments list |
-| `admin.mintHolding` | Mint a `SimpleHolding` for any party |
-| `admin.createPreapproval` | Create a `TransferPreapproval` for direct transfers |
-| `admin.listParties` | List all parties on the participant node |
-| `admin.getParticipantId` | Get the participant node ID |
-| `admin.listUsers` | List all Keycloak users |
-| `admin.getUser` | Get a user by ID |
-| `admin.grantRights` | Grant actAs rights to a user |
-| `admin.revokeRights` | Revoke actAs rights from a user |
-| `admin.getActiveContracts` | Query active contracts via the Ledger API |
-| `admin.listPackages` | List uploaded DAR package IDs |
-| `admin.listKnownTemplates` | List all template IDs indexed by PQS |
-| `admin.getAllActiveContracts` | Query all known templates via PQS |
-| `admin.lookupContract` | Look up any contract by ID (including archived) |
-| `admin.getTemplateSummary` | Active contract count per template |
+| `registration.register` | Create user (Canton party + ledger user + Keycloak user) |
+| `vault.depositRequests` | List deposit requests by party ID |
+| `vault.deposits` | List confirmed deposits by party ID |
+| `prepareCommand` | Prepare a Daml command for external party signing |
+| `submitSigned` | Submit an externally signed transaction |
 
 ### User (requires user JWT)
 
 | Procedure | Description |
 |---|---|
-| `user.onboardWallet` | Register with the Splice validator wallet |
-| `user.getHoldings` | List active holdings |
-| `user.getLockedHoldings` | List locked holdings (in-flight transfers) |
-| `user.getHoldingById` | Get a single holding by contract ID |
-| `user.getPendingTransfers` | List pending transfer instructions |
-| `user.getPreapprovals` | List active transfer preapprovals |
-| `user.initiateTransfer` | Start a transfer (self / direct / two-step) |
-| `user.acceptTransfer` | Accept a pending transfer instruction |
-| `user.rejectTransfer` | Reject a pending transfer instruction |
-| `user.withdrawTransfer` | Withdraw a transfer after deadline |
-| `user.getAllocations` | List active DvP allocations |
-| `user.cancelAllocation` | Cancel an allocation |
-| `user.withdrawAllocation` | Withdraw an allocation after deadline |
+| **Vault** | |
+| `user.getDepositRequests` | List pending deposit requests |
+| `user.getDeposits` | List confirmed deposits |
+| `user.createDepositRequest` | Propose a deposit |
+| `user.acceptDeposit` | Admin accepts a deposit request |
+| `user.cancelDepositRequest` | User cancels their request |
+| `user.withdrawDeposit` | User withdraws a confirmed deposit |
+| `user.releaseDeposit` | Admin releases a deposit |
+| **CC (Canton Coin)** | |
+| `user.getCcBalance` | CC balance via validator wallet API |
+| `user.sendCc` | Send CC transfer offer |
+| `user.listCcTransferOffers` | List pending CC offers |
+| `user.acceptCcTransferOffer` | Accept a CC offer |
 
----
+### Admin (requires admin JWT)
 
-## Transfer paths
-
-`initiateTransfer` dispatches to one of three paths automatically:
-
-1. **Self-transfer** — sender equals receiver, immediate settlement
-2. **Direct transfer** — pass a `preapprovalCid`; receiver has pre-authorized via `TransferPreapproval`
-3. **Two-step transfer** — no preapproval; creates a pending `SimpleTransferInstruction` the receiver must accept
+| Procedure | Description |
+|---|---|
+| `admin.listParties` | List parties on the participant |
+| `admin.listPackages` | List uploaded DAR package IDs |
+| `admin.listKnownTemplates` | List all template IDs indexed by PQS |
+| `admin.getAllActiveContracts` | Query all known templates via PQS |
+| `admin.lookupContract` | Look up any contract by ID |
+| `admin.getTemplateSummary` | Active contract count per template |
 
 ---
 
@@ -354,54 +265,92 @@ scripts/daml-codegen.sh \
 
 ```
 scaffold-canton/
+├── daml/                          # Daml smart contract
+│   ├── daml.yaml                  # SDK 3.4.10, scaffold-vault 0.1.0
+│   └── daml/
+│       └── Vault.daml             # DepositRequest + Deposit templates
 ├── backend/
 │   ├── src/
-│   │   ├── index.ts              # Entry point, Hono app, CORS, tRPC mount
-│   │   ├── trpc.ts               # tRPC context + procedure tiers (public / party / admin)
-│   │   ├── instrumentation.ts    # OpenTelemetry
-│   │   ├── auth/                 # Keycloak JWT validation
-│   │   ├── ledger/               # Canton Ledger API v2 client (submit, ACS, packages)
-│   │   ├── participant/          # Party + user management (Ledger API)
-│   │   ├── pqs/                  # PQS postgres client (active(), lookup_contract())
-│   │   ├── keycloak/             # Keycloak Admin REST API client
-│   │   ├── registration/         # Registration saga (retry + compensation)
-│   │   ├── domain/               # Token template types + command builders
-│   │   │   ├── types.ts          # Shared types and TEMPLATE_IDS
-│   │   │   ├── rules.ts          # SimpleTokenRules commands
-│   │   │   ├── holdings.ts       # SimpleHolding / LockedSimpleHolding
-│   │   │   ├── transfers.ts      # TransferInstruction + TransferPreapproval
-│   │   │   └── allocations.ts    # SimpleAllocation
-│   │   ├── router/               # tRPC routers
-│   │   │   ├── admin.ts
-│   │   │   ├── user.ts
-│   │   │   └── registration.ts
-│   │   └── tests/                # Vitest unit tests
+│   │   ├── index.ts               # Hono app, CORS, tRPC mount
+│   │   ├── domain/
+│   │   │   ├── types.ts           # TEMPLATE_IDS + shared types
+│   │   │   └── vault.ts           # Vault command builders + PQS queries
+│   │   ├── generated/
+│   │   │   └── template-ids.ts    # Generated package hashes (from codegen)
+│   │   ├── router/
+│   │   │   ├── index.ts           # Public routes (vault reads, prepare/submit-signed)
+│   │   │   ├── admin.ts           # Admin procedures
+│   │   │   ├── user.ts            # User + vault + CC procedures
+│   │   │   └── registration.ts    # User registration saga
+│   │   ├── auth/                  # JWT validation
+│   │   ├── ledger/                # Canton Ledger API v2 client
+│   │   ├── participant/           # Party/user management
+│   │   ├── pqs/                   # PQS PostgreSQL client
+│   │   └── keycloak/              # Keycloak Admin API
 │   └── .env.example
 ├── frontend/
 │   └── src/
-│       ├── App.tsx               # Tab layout + auth
+│       ├── App.tsx                # Tab layout, dual auth (OIDC + wallet)
+│       ├── wallet/
+│       │   └── gatewaySdk.ts      # DappSDK singleton
 │       ├── tabs/
-│       │   ├── AdminTab.tsx      # Admin procedures
-│       │   ├── UserTab.tsx       # User write operations
-│       │   └── PqsTab.tsx        # PQS read queries
-│       └── components/           # Panel, Field, ResultBox, TabBar
+│       │   ├── AuthTab.tsx        # Wallet Gateway + Admin (Keycloak) login
+│       │   ├── VaultTab.tsx       # Vault: deposit/withdraw (wallet + admin)
+│       │   ├── AdminTab.tsx       # Admin operations
+│       │   ├── PqsTab.tsx         # PQS read queries
+│       │   ├── RegistrationTab.tsx # User registration
+│       │   └── HealthTab.tsx      # Health check
+│       └── components/
+├── wallet-gateway/
+│   ├── config.json                # Wallet gateway config (gitignored)
+│   └── package.json
 └── scripts/
-    └── daml-codegen.sh           # Batch codegen for all DARs in a directory
+    └── daml-codegen.sh            # Batch JS/TS codegen from DARs
 ```
 
 ---
 
-## DAR reference
+## Template IDs and package hashes
 
-All templates from `simple-token-0.1.0`:
+**Canton 3.4.12+ requires full package hashes in template IDs** for Ledger API command submission. `Vault:DepositRequest` (without hash) silently fails with "Invalid value for: body". You must use the full form: `7c39422f...:Vault:DepositRequest`.
 
-| Template | Signatories | Purpose |
-|---|---|---|
-| `SimpleHolding` | admin, owner | Unlocked token holding |
-| `LockedSimpleHolding` | admin, owner, lock.holders | In-flight locked holding |
-| `SimpleTokenRules` | admin | Factory for transfers + allocations |
-| `SimpleTransferInstruction` | admin, sender | Pending two-step transfer |
-| `SimpleAllocation` | admin, sender | DvP settlement contract |
-| `TransferPreapproval` | admin, receiver | Pre-auth for direct transfers |
+The codegen script generates `backend/src/generated/template-ids.ts` with the correct hashed IDs. Both the backend (`domain/types.ts`) and frontend (`VaultTab.tsx`) import from this file.
 
-Template IDs for PQS queries use the format `SimpleToken.<Module>:<Template>` (e.g. `SimpleToken.Holding:SimpleHolding`).
+**PQS uses a different format**: the `active()` function uses `Module:Template` (no hash). These are defined inline in `domain/vault.ts`.
+
+| Context | Format | Example |
+|---------|--------|---------|
+| Ledger API (submit) | `hash:Module:Template` | `7c39422f...:Vault:DepositRequest` |
+| PQS `active()` | `Module:Template` | `Vault:DepositRequest` |
+| dApp SDK `prepareExecute` | `hash:Module:Template` | `7c39422f...:Vault:DepositRequest` |
+
+---
+
+## Rebuilding after Daml changes
+
+```bash
+# 1. Edit daml/daml/Vault.daml
+
+# 2. Rebuild the DAR
+cd daml && daml build
+
+# 3. Regenerate TypeScript bindings (updates package hashes)
+cd .. && scripts/daml-codegen.sh -i daml/.daml/dist -o backend/src/generated
+
+# 4. Upload new DAR to participant
+curl -fsS -X POST "https://ledger.yourdomain.com/v2/packages" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @daml/.daml/dist/scaffold-vault-0.1.0.dar
+
+# 5. Restart backend + frontend (picks up new template IDs from generated/template-ids.ts)
+
+# 6. Re-index PQS (on the server) so it discovers the new templates
+ssh your-server
+docker compose -f pqs/compose.yaml down
+docker volume rm pqs_postgres-pqs-data
+docker compose -f pqs/compose.yaml up -d
+# Wait ~2 minutes for PQS to replay the ledger and become healthy
+```
+
+> **PQS won't discover new DAR packages automatically.** After uploading a new DAR, you must re-index PQS (step 6) or at minimum restart it. PQS caches its template registry and only discovers new packages when replaying the ledger stream.

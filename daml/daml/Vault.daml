@@ -1,0 +1,46 @@
+-- Vault: simple deposit/withdraw scaffold for Canton 3.x
+-- Users propose deposits, admin accepts. Users can withdraw their own deposits.
+-- No contract keys (Canton 3.x) — track contract IDs at the application level.
+
+module Vault where
+
+-- A user proposes to deposit funds. The admin must accept.
+template DepositRequest
+  with
+    user   : Party
+    admin  : Party
+    amount : Text    -- decimal as text for ledger compatibility
+    memo   : Text
+  where
+    signatory user
+    observer admin
+
+    -- Admin accepts the deposit request, creating a Deposit record.
+    choice DepositRequest_Accept : ContractId Deposit
+      controller admin
+      do create Deposit with user, admin, amount, memo
+
+    -- User can cancel their own request.
+    choice DepositRequest_Cancel : ()
+      controller user
+      do return ()
+
+-- A confirmed deposit. Both user and admin are signatories.
+template Deposit
+  with
+    user   : Party
+    admin  : Party
+    amount : Text
+    memo   : Text
+  where
+    signatory user, admin
+
+    -- User withdraws their deposit (archives the contract).
+    choice Deposit_Withdraw : ()
+      controller user
+      do return ()
+
+    -- Admin can also release the deposit back (e.g. forced return).
+    choice Deposit_Release : ()
+      controller admin
+      do return ()

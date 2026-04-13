@@ -78,7 +78,7 @@ const app = new Hono()
 
 app.use('*', cors({
   origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
-  allowHeaders: ['Content-Type', 'Authorization'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Party-Id'],
   allowMethods: ['GET', 'POST', 'OPTIONS'],
 }))
 
@@ -105,6 +105,12 @@ app.use(
             partyId = found
           }
         }
+      }
+      // Last resort: trust X-Party-Id hint from the frontend, but only when the JWT
+      // was already verified (auth.token is non-empty) and no party resolved via claims.
+      if (!partyId && auth.token) {
+        const hint = req.headers.get('x-party-id') ?? ''
+        if (hint.includes('::')) partyId = hint
       }
       const isAdmin = partyId === authConfig.adminParty
       return { ...auth, partyId, isAdmin, adminParty: authConfig.adminParty, pqs, ledger, participant, keycloak, validatorUrl: process.env.VALIDATOR_URL ?? '', getLedgerToken }
