@@ -1,0 +1,7 @@
+{
+  "name": "wallet-gateway",
+  "private": true,
+  "scripts": {
+    "start": "npx @canton-network/wallet-gateway-remote -c ./config.json"
+  }
+}

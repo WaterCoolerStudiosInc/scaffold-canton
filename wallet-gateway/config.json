@@ -1,0 +1,61 @@
+{
+  "kernel": {
+    "id": "scaffold-wallet-gateway",
+    "clientType": "remote",
+    "publicUrl": "http://localhost:3030"
+  },
+  "server": {
+    "port": 3030,
+    "allowedOrigins": [
+      "http://localhost:5173",
+      "http://localhost:3030"
+    ]
+  },
+  "store": {
+    "connection": {
+      "type": "sqlite",
+      "database": "store.sqlite"
+    }
+  },
+  "signingStore": {
+    "connection": {
+      "type": "sqlite",
+      "database": "signingStore.sqlite"
+    }
+  },
+  "bootstrap": {
+    "idps": [
+      {
+        "id": "keycloak",
+        "type": "oauth",
+        "issuer": "https://auth.cenote.cc/realms/canton",
+        "configUrl": "https://auth.cenote.cc/realms/canton/.well-known/openid-configuration"
+      }
+    ],
+    "networks": [
+      {
+        "id": "canton:cenote",
+        "name": "Cenote",
+        "description": "Cenote devnet",
+        "synchronizerId": "global-domain::1220be58c29e65de40bf273be1dc2b266d43a9a002ea5b18955aeef7aac881bb471a",
+        "identityProviderId": "keycloak",
+        "auth": {
+          "method": "authorization_code",
+          "audience": "https://canton.network.global",
+          "scope": "openid daml_ledger_api offline_access",
+          "clientId": "canton-test-dashboard"
+        },
+        "adminAuth": {
+          "method": "client_credentials",
+          "audience": "https://canton.network.global",
+          "scope": "openid daml_ledger_api offline_access",
+          "clientId": "validator-app",
+          "clientSecret": "dabe7fb1403ff0609141a92013bed38fe45b63cdaa08a1e43420c2a09ea4d859"
+        },
+        "ledgerApi": {
+          "baseUrl": "https://ledger.cenote.cc"
+        }
+      }
+    ]
+  }
+}

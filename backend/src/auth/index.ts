@@ -41,7 +41,11 @@ export async function resolveContext(
       const { payload } = await jose.jwtVerify(token, jwks, {
         audience: config.audience,
       })
-      const partyId = (payload['party_id'] as string | undefined) ?? ''
+      // Try party_id claim first, then sub if it looks like a Canton party (contains ::)
+      const partyId =
+        (payload['party_id'] as string | undefined) ??
+        (typeof payload.sub === 'string' && payload.sub.includes('::') ? payload.sub : '') ??
+        ''
       const sub = payload.sub
       return { partyId, isAdmin: partyId === config.adminParty, token, sub }
     } catch {
