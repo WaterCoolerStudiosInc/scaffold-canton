@@ -71,7 +71,12 @@ VITE_WALLET_GATEWAY_URL=http://localhost:3030
 
 ### Wallet gateway `config.json`
 
-See `wallet-gateway/config.json`. Key fields: Keycloak IDP, network synchronizer ID, Ledger API URL, admin auth credentials. The config is gitignored.
+```bash
+cp wallet-gateway/config.example.json wallet-gateway/config.json
+# Edit config.json with your validator details
+```
+
+Key fields: Keycloak IDP, network synchronizer ID, Ledger API URL, admin auth credentials. `config.json` is gitignored.
 
 ---
 
