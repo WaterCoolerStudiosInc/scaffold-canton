@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package com.daml.ledger.api.v2.admin;
+
+import "com/daml/ledger/api/v2/package_service.proto";
+
+// Minimal subset of Canton's package_management_service.proto — only
+// UpdateVettedPackages. expected_topology_serial, update_vetted_packages_force_flags,
+// and the Vet.new_valid_{from,until} timestamps are omitted; the server treats
+// missing fields as defaults.
+
+service PackageManagementService {
+  rpc UpdateVettedPackages(UpdateVettedPackagesRequest) returns (UpdateVettedPackagesResponse);
+}
+
+message UpdateVettedPackagesRequest {
+  repeated VettedPackagesChange changes = 1;
+  bool dry_run = 2;
+  string synchronizer_id = 3;
+}
+
+message UpdateVettedPackagesResponse {
+  com.daml.ledger.api.v2.VettedPackages past_vetted_packages = 1;
+  com.daml.ledger.api.v2.VettedPackages new_vetted_packages = 2;
+}
+
+message VettedPackagesChange {
+  oneof operation {
+    Vet vet = 1;
+    Unvet unvet = 2;
+  }
+  message Vet {
+    repeated VettedPackagesRef packages = 1;
+  }
+  message Unvet {
+    repeated VettedPackagesRef packages = 1;
+  }
+}
+
+message VettedPackagesRef {
+  string package_id = 1;
+  string package_name = 2;
+  string package_version = 3;
+}

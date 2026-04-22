@@ -64,6 +64,80 @@ export const adminRouter = router({
     return ctx.ledger.listPackages();
   }),
 
+  listVettedPackages: adminProcedure
+    .input(
+      z
+        .object({
+          packageIds: z.array(z.string()).optional(),
+          packageNamePrefixes: z.array(z.string()).optional(),
+          participantIds: z.array(z.string()).optional(),
+          synchronizerIds: z.array(z.string()).optional(),
+          pageSize: z.number().int().min(1).max(100).optional(),
+        })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      return ctx.topology.listVettedPackages(input);
+    }),
+
+  vetPackage: adminProcedure
+    .input(
+      z.object({
+        packageId: z.string().length(64),
+        packageName: z.string().min(1),
+        packageVersion: z.string().min(1),
+        synchronizerId: z.string().optional(),
+        dryRun: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.topology.updateVettedPackages({
+        vet: [{ package_id: input.packageId, package_name: input.packageName, package_version: input.packageVersion }],
+        dryRun: input.dryRun,
+        synchronizerId: input.synchronizerId,
+      });
+    }),
+
+  unvetPackage: adminProcedure
+    .input(
+      z.object({
+        packageId: z.string().length(64),
+        packageName: z.string().min(1),
+        packageVersion: z.string().min(1),
+        synchronizerId: z.string().optional(),
+        dryRun: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.topology.updateVettedPackages({
+        unvet: [{ package_id: input.packageId, package_name: input.packageName, package_version: input.packageVersion }],
+        dryRun: input.dryRun,
+        synchronizerId: input.synchronizerId,
+      });
+    }),
+
+  swapVettedPackage: adminProcedure
+    .input(
+      z.object({
+        unvet: z.object({ packageId: z.string().length(64), packageName: z.string().min(1), packageVersion: z.string().min(1) }),
+        vet: z.object({ packageId: z.string().length(64), packageName: z.string().min(1), packageVersion: z.string().min(1) }),
+        synchronizerId: z.string().optional(),
+        dryRun: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.topology.updateVettedPackages({
+        unvet: [
+          { package_id: input.unvet.packageId, package_name: input.unvet.packageName, package_version: input.unvet.packageVersion },
+        ],
+        vet: [
+          { package_id: input.vet.packageId, package_name: input.vet.packageName, package_version: input.vet.packageVersion },
+        ],
+        dryRun: input.dryRun,
+        synchronizerId: input.synchronizerId,
+      });
+    }),
+
   listKnownTemplates: adminProcedure.query(async ({ ctx }) => {
     return ctx.pqs.listKnownTemplates();
   }),

@@ -44,6 +44,8 @@ Open `http://localhost:5173`.
 ```bash
 APP_PROVIDER_PARTY=cenote-validator-1::1220...   # your admin party
 LEDGER_URL=https://ledger.yourdomain.com
+LEDGER_GRPC_URL=grpc.yourdomain.com:443          # gRPC endpoint for admin topology ops (package vetting)
+LEDGER_GRPC_TLS=true                             # false for plaintext local dev
 VALIDATOR_URL=https://wallet.yourdomain.com
 SYNCHRONIZER_ID=global-domain::1220...
 LEDGER_TOKEN_URL=https://auth.yourdomain.com/realms/canton/protocol/openid-connect/token
@@ -195,7 +197,11 @@ The codegen script generates `backend/src/generated/template-ids.ts` with hashed
 | Procedure | Description |
 |---|---|
 | `admin.listParties` | List parties |
-| `admin.listPackages` | List DAR packages |
+| `admin.listPackages` | List DAR packages (registered on participant) |
+| `admin.listVettedPackages` | List vetted packages (scope by participant/synchronizer) |
+| `admin.vetPackage` | Vet a package on the synchronizer (topology write) |
+| `admin.unvetPackage` | Unvet a package (topology write) |
+| `admin.swapVettedPackage` | Atomic unvet + vet in one topology transaction |
 | `admin.listKnownTemplates` | PQS template registry |
 | `admin.getTemplateSummary` | Contract counts per template |
 | `admin.getActiveContracts` | Query ACS via Ledger API |
@@ -211,6 +217,7 @@ scaffold-canton/
 │   ├── daml.yaml                  # SDK 3.4.10
 │   └── daml/Vault.daml            # DepositRequest + Deposit
 ├── backend/
+│   ├── proto/                     # Canton Ledger API gRPC protos (package vetting)
 │   └── src/
 │       ├── index.ts               # Hono server, tRPC mount
 │       ├── domain/
@@ -224,7 +231,7 @@ scaffold-canton/
 │       │   ├── user.ts            # User + vault + CC procedures
 │       │   └── registration.ts    # User registration
 │       ├── auth/                  # JWT validation
-│       ├── ledger/                # Ledger API v2 client
+│       ├── ledger/                # Ledger API v2 client (JSON) + topology.ts (gRPC for vetting)
 │       ├── participant/           # Party/user management
 │       ├── pqs/                   # PQS PostgreSQL client
 │       └── keycloak/              # Keycloak Admin API
@@ -288,3 +295,29 @@ docker compose -f pqs/compose.yaml up -d
 ```
 
 > PQS won't discover new packages automatically. Re-index after uploading new DARs.
+
+---
+
+## Package vetting
+
+Uploading a DAR registers it locally on the participant; **vetting** is a separate topology transaction that advertises "this participant accepts this package" to the synchronizer. `POST /v2/packages` usually auto-vets, but the vetted state and individual vet/unvet operations aren't on the JSON Ledger API — they're on the gRPC `PackageManagementService`.
+
+### Canton SCU constraint
+
+Canton refuses to vet two packages that share the same `(name, version)` pair — even if the source (and hash) differ. Error: `KNOWN_PACKAGE_VERSION`. If you build a new version of the same DAR, bump `version` in `daml.yaml` so SCU can coexist the old and new.
+
+### Admin UI
+
+The **Admin** tab exposes these operations:
+
+- **listVettedPackages** — filter by package IDs / name prefixes / participants / synchronizers.
+  > The metadata filter is a no-op unless `participantIds` or `synchronizerIds` is also set (Canton 3.4.12 server quirk).
+- **vetPackage / unvetPackage** — single-package topology changes, with dry-run by default.
+- **swapVettedPackage** — atomic unvet + vet, for resolving the name+version conflict above.
+
+### Under the hood
+
+- `backend/proto/` — minimal Canton gRPC `.proto` files (`ListVettedPackages`, `UpdateVettedPackages`)
+- `backend/src/ledger/topology.ts` — `@grpc/grpc-js` client, injects Bearer auth per call
+- `LEDGER_GRPC_URL` env — typically an nginx-proxied hostname to the participant's Ledger API gRPC port
+- Uses the same `validator-app` client credentials as the JSON Ledger API

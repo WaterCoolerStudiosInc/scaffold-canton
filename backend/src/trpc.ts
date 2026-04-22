@@ -1,6 +1,7 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { PqsClient } from './pqs/index.js';
 import type { LedgerClient } from './ledger/index.js';
+import type { TopologyClient } from './ledger/topology.js';
 import type { ParticipantClient } from './participant/index.js';
 import type { KeycloakClient } from './keycloak/index.js';
 
@@ -13,6 +14,7 @@ export type Context = {
   pqs: PqsClient;
   ledger: LedgerClient;
   participant: ParticipantClient;
+  topology: TopologyClient;
   keycloak: KeycloakClient;
   validatorUrl: string;
   getLedgerToken: () => Promise<string>;

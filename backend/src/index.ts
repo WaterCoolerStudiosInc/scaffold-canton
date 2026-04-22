@@ -8,6 +8,7 @@ import { createUploadRouter } from './router/upload.js'
 import { resolveContext, type AuthConfig } from './auth/index.js'
 import { createPqsClient } from './pqs/index.js'
 import { createLedgerClient } from './ledger/index.js'
+import { createTopologyClient } from './ledger/topology.js'
 import { createParticipantClient } from './participant/index.js'
 import { createKeycloakClient } from './keycloak/index.js'
 
@@ -64,6 +65,13 @@ const participant = createParticipantClient(
   getLedgerToken
 )
 
+const topology = createTopologyClient({
+  address: process.env.LEDGER_GRPC_URL ?? 'localhost:5001',
+  synchronizerId: process.env.SYNCHRONIZER_ID ?? '',
+  getToken: getLedgerToken,
+  useTls: (process.env.LEDGER_GRPC_TLS ?? 'true').toLowerCase() !== 'false',
+})
+
 const keycloak = createKeycloakClient(
   process.env.KEYCLOAK_BASE_URL ?? '',
   process.env.KEYCLOAK_REALM ?? 'canton',
@@ -113,7 +121,7 @@ app.use(
         if (hint.includes('::')) partyId = hint
       }
       const isAdmin = partyId === authConfig.adminParty
-      return { ...auth, partyId, isAdmin, adminParty: authConfig.adminParty, pqs, ledger, participant, keycloak, validatorUrl: process.env.VALIDATOR_URL ?? '', getLedgerToken }
+      return { ...auth, partyId, isAdmin, adminParty: authConfig.adminParty, pqs, ledger, participant, topology, keycloak, validatorUrl: process.env.VALIDATOR_URL ?? '', getLedgerToken }
     },
   })
 )

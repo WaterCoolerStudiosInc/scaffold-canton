@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package com.daml.ledger.api.v2;
+
+// Minimal subset of Canton's package_service.proto — only ListVettedPackages
+// and the messages it transitively needs. Timestamp-typed fields on VettedPackage
+// are intentionally omitted so we don't have to vendor google/protobuf/*.proto;
+// unknown fields from the wire are discarded by the parser.
+
+service PackageService {
+  rpc ListVettedPackages(ListVettedPackagesRequest) returns (ListVettedPackagesResponse);
+}
+
+message ListVettedPackagesRequest {
+  PackageMetadataFilter package_metadata_filter = 1;
+  TopologyStateFilter topology_state_filter = 2;
+  string page_token = 3;
+  uint32 page_size = 4;
+}
+
+message ListVettedPackagesResponse {
+  repeated VettedPackages vetted_packages = 1;
+  string next_page_token = 2;
+}
+
+message VettedPackages {
+  repeated VettedPackage packages = 1;
+  string participant_id = 2;
+  string synchronizer_id = 3;
+  uint32 topology_serial = 4;
+}
+
+message VettedPackage {
+  string package_id = 1;
+  // valid_from_inclusive = 2 and valid_until_exclusive = 3 (google.protobuf.Timestamp) intentionally omitted
+  string package_name = 4;
+  string package_version = 5;
+}
+
+message PackageMetadataFilter {
+  repeated string package_ids = 1;
+  repeated string package_name_prefixes = 2;
+}
+
+message TopologyStateFilter {
+  repeated string participant_ids = 1;
+  repeated string synchronizer_ids = 2;
+}

@@ -20,7 +20,7 @@ React 19 + Vite dashboard with dual auth: wallet gateway (dApp SDK) and Keycloak
 
 - **Auth** — Wallet gateway connect + Admin Keycloak login
 - **Vault** — Deposit/withdraw (user via dApp SDK, admin via tRPC)
-- **Admin** — Parties, users, packages, contracts (Keycloak required)
+- **Admin** — Parties, users, packages, contracts, package vetting (list/vet/unvet/swap) (Keycloak required)
 - **PQS** — Raw PQS queries
 - **Registration** — Create new users
 - **Health** — Health check

@@ -16,6 +16,7 @@ Hono + tRPC server for Canton Ledger API writes, PQS reads, and user management.
 - **postgres** (3.4.8) — PQS PostgreSQL client
 - **jose** (6.2.1) — JWT verification
 - **zod** (4.3.6) — Input validation
+- **@grpc/grpc-js** + **@grpc/proto-loader** — gRPC client for Canton topology ops (package vetting)
 
 ## Structure
 
@@ -24,16 +25,20 @@ Hono + tRPC server for Canton Ledger API writes, PQS reads, and user management.
 - `src/domain/` — Vault command builders + PQS queries (`vault.ts`, `types.ts`)
 - `src/generated/template-ids.ts` — Package-hashed template IDs (from codegen)
 - `src/auth/` — Keycloak JWT validation
-- `src/ledger/` — Canton Ledger API v2 client (submit, ACS, packages)
+- `src/ledger/` — Canton Ledger API clients: `index.ts` (JSON v2: submit, ACS, packages), `topology.ts` (gRPC: list/vet/unvet packages)
 - `src/pqs/` — PQS PostgreSQL queries
 - `src/participant/` — Party/user management
 - `src/keycloak/` — Keycloak Admin API (user creation)
+- `proto/com/daml/ledger/api/v2/` — Minimal Canton protos for `PackageService.ListVettedPackages` and `admin.PackageManagementService.UpdateVettedPackages` (loaded at runtime via proto-loader)
 
 ## Notes
 
 - `domain/types.ts` re-exports `TEMPLATE_IDS` from `generated/template-ids.ts`
 - PQS queries in `vault.ts` use unhashed IDs (`Vault:DepositRequest`)
 - Ledger API commands use hashed IDs from `template-ids.ts`
+- Topology gRPC calls go to `LEDGER_GRPC_URL` (e.g. `grpc.yourdomain.com:443`). Auth reuses the `validator-app` client credentials.
+- `ListVettedPackages` server quirk: the `package_metadata_filter` only applies when `topology_state_filter` is also set. Callers should scope by participant or synchronizer.
+- Canton refuses to vet two packages with the same `(name, version)` — use `admin.swapVettedPackage` to atomically unvet+vet, or bump the Daml `version` to coexist them.
 
 ## Example Code
 

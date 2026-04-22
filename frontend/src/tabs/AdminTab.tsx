@@ -158,6 +158,191 @@ function ListPackagesPanel() {
   )
 }
 
+function ListVettedPackagesPanel() {
+  const [packageIds, setPackageIds] = useState('')
+  const [namePrefixes, setNamePrefixes] = useState('')
+  const [participantIds, setParticipantIds] = useState('')
+  const [synchronizerIds, setSynchronizerIds] = useState('')
+  const { loading, result, error, run } = useCall()
+  const splitLines = (s: string) => s.split('\n').map(x => x.trim()).filter(Boolean)
+  return (
+    <Panel title="listVettedPackages">
+      <p className="text-xs text-gray-500 mb-2">
+        Canton quirk: the metadata filter only applies when a topology filter is also set. Scope by participant or synchronizer.
+      </p>
+      <div className="flex flex-col gap-2 max-w-lg">
+        <label className="flex flex-col gap-1 text-xs text-gray-600">
+          Package IDs (one per line, optional)
+          <textarea value={packageIds} onChange={e => setPackageIds(e.target.value)}
+            rows={2} className="border rounded px-2 py-1.5 text-sm text-gray-900 font-mono" />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-gray-600">
+          Package name prefixes (one per line, optional)
+          <textarea value={namePrefixes} onChange={e => setNamePrefixes(e.target.value)}
+            rows={2} className="border rounded px-2 py-1.5 text-sm text-gray-900 font-mono"
+            placeholder="scaffold-vault" />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-gray-600">
+          Participant IDs (one per line, optional)
+          <textarea value={participantIds} onChange={e => setParticipantIds(e.target.value)}
+            rows={2} className="border rounded px-2 py-1.5 text-sm text-gray-900 font-mono" />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-gray-600">
+          Synchronizer IDs (one per line, optional)
+          <textarea value={synchronizerIds} onChange={e => setSynchronizerIds(e.target.value)}
+            rows={2} className="border rounded px-2 py-1.5 text-sm text-gray-900 font-mono" />
+        </label>
+      </div>
+      <Btn
+        onClick={() => run(() => trpc.admin.listVettedPackages.query({
+          packageIds: splitLines(packageIds).length ? splitLines(packageIds) : undefined,
+          packageNamePrefixes: splitLines(namePrefixes).length ? splitLines(namePrefixes) : undefined,
+          participantIds: splitLines(participantIds).length ? splitLines(participantIds) : undefined,
+          synchronizerIds: splitLines(synchronizerIds).length ? splitLines(synchronizerIds) : undefined,
+        }))}
+        loading={loading} label="List Vetted"
+      />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
+type PkgRefFields = { packageId: string; packageName: string; packageVersion: string }
+
+function PkgRefInputs({ prefix, value, onChange }: { prefix: string; value: PkgRefFields; onChange: (v: PkgRefFields) => void }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Field label={`${prefix} Package ID (64-char hash)`} value={value.packageId}
+        onChange={v => onChange({ ...value, packageId: v })} placeholder="9cb4f65b..." />
+      <Field label={`${prefix} Package Name`} value={value.packageName}
+        onChange={v => onChange({ ...value, packageName: v })} placeholder="scaffold-vault" />
+      <Field label={`${prefix} Version`} value={value.packageVersion}
+        onChange={v => onChange({ ...value, packageVersion: v })} placeholder="0.1.0" />
+    </div>
+  )
+}
+
+function VetPackagePanel() {
+  const [pkg, setPkg] = useState<PkgRefFields>({ packageId: '', packageName: '', packageVersion: '' })
+  const [synchronizerId, setSynchronizerId] = useState('')
+  const [dryRun, setDryRun] = useState(true)
+  const { loading, result, error, run } = useCall()
+  return (
+    <Panel title="vetPackage">
+      <p className="text-xs text-gray-500 mb-2">
+        Submits a topology transaction advertising that this participant vets the package on the synchronizer. Dry-run is on by default.
+      </p>
+      <div className="max-w-lg">
+        <PkgRefInputs prefix="" value={pkg} onChange={setPkg} />
+        <div className="mt-2">
+          <Field label="Synchronizer ID (optional — defaults to SYNCHRONIZER_ID env)" value={synchronizerId}
+            onChange={setSynchronizerId} placeholder="global-domain::1220..." />
+        </div>
+        <label className="flex items-center gap-2 mt-2 text-xs text-gray-700">
+          <input type="checkbox" checked={dryRun} onChange={e => setDryRun(e.target.checked)} />
+          Dry run (validate without committing)
+        </label>
+      </div>
+      <Btn
+        onClick={() => run(() => trpc.admin.vetPackage.mutate({
+          packageId: pkg.packageId.trim(),
+          packageName: pkg.packageName.trim(),
+          packageVersion: pkg.packageVersion.trim(),
+          synchronizerId: synchronizerId.trim() || undefined,
+          dryRun,
+        }))}
+        loading={loading} label={dryRun ? 'Dry-run Vet' : 'Vet Package'}
+      />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
+function UnvetPackagePanel() {
+  const [pkg, setPkg] = useState<PkgRefFields>({ packageId: '', packageName: '', packageVersion: '' })
+  const [synchronizerId, setSynchronizerId] = useState('')
+  const [dryRun, setDryRun] = useState(true)
+  const { loading, result, error, run } = useCall()
+  return (
+    <Panel title="unvetPackage">
+      <p className="text-xs text-gray-500 mb-2">
+        Removes this participant's vetting for a package. Contracts created with this package can no longer be exercised.
+      </p>
+      <div className="max-w-lg">
+        <PkgRefInputs prefix="" value={pkg} onChange={setPkg} />
+        <div className="mt-2">
+          <Field label="Synchronizer ID (optional)" value={synchronizerId}
+            onChange={setSynchronizerId} placeholder="global-domain::1220..." />
+        </div>
+        <label className="flex items-center gap-2 mt-2 text-xs text-gray-700">
+          <input type="checkbox" checked={dryRun} onChange={e => setDryRun(e.target.checked)} />
+          Dry run
+        </label>
+      </div>
+      <Btn
+        onClick={() => run(() => trpc.admin.unvetPackage.mutate({
+          packageId: pkg.packageId.trim(),
+          packageName: pkg.packageName.trim(),
+          packageVersion: pkg.packageVersion.trim(),
+          synchronizerId: synchronizerId.trim() || undefined,
+          dryRun,
+        }))}
+        loading={loading} label={dryRun ? 'Dry-run Unvet' : 'Unvet Package'}
+      />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
+function SwapVettedPackagePanel() {
+  const [unvet, setUnvet] = useState<PkgRefFields>({ packageId: '', packageName: '', packageVersion: '' })
+  const [vet, setVet] = useState<PkgRefFields>({ packageId: '', packageName: '', packageVersion: '' })
+  const [synchronizerId, setSynchronizerId] = useState('')
+  const [dryRun, setDryRun] = useState(true)
+  const { loading, result, error, run } = useCall()
+  return (
+    <Panel title="swapVettedPackage">
+      <p className="text-xs text-gray-500 mb-2">
+        Atomic unvet + vet in one topology transaction. Use when two packages share name+version and Canton refuses to vet both.
+      </p>
+      <div className="flex flex-col gap-4 max-w-lg">
+        <div>
+          <div className="text-xs font-semibold text-gray-700 mb-1">Unvet (remove)</div>
+          <PkgRefInputs prefix="Unvet" value={unvet} onChange={setUnvet} />
+        </div>
+        <div>
+          <div className="text-xs font-semibold text-gray-700 mb-1">Vet (add)</div>
+          <PkgRefInputs prefix="Vet" value={vet} onChange={setVet} />
+        </div>
+        <Field label="Synchronizer ID (optional)" value={synchronizerId}
+          onChange={setSynchronizerId} placeholder="global-domain::1220..." />
+        <label className="flex items-center gap-2 text-xs text-gray-700">
+          <input type="checkbox" checked={dryRun} onChange={e => setDryRun(e.target.checked)} />
+          Dry run
+        </label>
+      </div>
+      <Btn
+        onClick={() => run(() => trpc.admin.swapVettedPackage.mutate({
+          unvet: {
+            packageId: unvet.packageId.trim(),
+            packageName: unvet.packageName.trim(),
+            packageVersion: unvet.packageVersion.trim(),
+          },
+          vet: {
+            packageId: vet.packageId.trim(),
+            packageName: vet.packageName.trim(),
+            packageVersion: vet.packageVersion.trim(),
+          },
+          synchronizerId: synchronizerId.trim() || undefined,
+          dryRun,
+        }))}
+        loading={loading} label={dryRun ? 'Dry-run Swap' : 'Swap'}
+      />
+      <ResultBox result={result} error={error} />
+    </Panel>
+  )
+}
+
 function ListKnownTemplatesPanel() {
   const { loading, result, error, run } = useCall()
   return (
@@ -234,6 +419,10 @@ export function AdminTab() {
       </p>
       <UploadPackagePanel />
       <ListPackagesPanel />
+      <ListVettedPackagesPanel />
+      <VetPackagePanel />
+      <UnvetPackagePanel />
+      <SwapVettedPackagePanel />
       <ListKnownTemplatesPanel />
       <TemplateSummaryPanel />
       <GetActiveContractsPanel />
